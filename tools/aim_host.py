@@ -402,7 +402,10 @@ def find_port(preferred):
     if preferred and preferred != "auto":
         return preferred
     try:
-        ports = sorted(port.device for port in list_ports.comports() if port.vid == 0x303A)
+        ports = sorted({port.device for port in list_ports.comports() if port.vid == 0x303A})
+        if len(ports) > 1:
+            LOG("Multiple Espressif ports found; set an explicit port in tools/aim_host.json: " + ", ".join(ports))
+            return None
         return ports[0] if ports else None
     except Exception as e:
         LOG(f"port scan failed: {e}")

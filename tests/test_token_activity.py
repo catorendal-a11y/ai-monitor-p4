@@ -11,6 +11,33 @@ import aim_host
 
 
 class TokenActivityTests(unittest.TestCase):
+    def test_temporarily_absent_request_is_not_counted_twice(self):
+        clock = {"now": 100.0}
+        reporter = TokenReporter(home=Path("unused"), clock=lambda: clock["now"])
+        data = {"codex": {}, "zcode": {"request": 2000}}
+        with patch.object(reporter, "read_counts", side_effect=lambda provider, path: data[provider]):
+            self.assertEqual(reporter.poll()["delta"], 0)
+            clock["now"] += 2; data["zcode"] = {}
+            self.assertEqual(reporter.poll()["delta"], 0)
+            clock["now"] += 2; data["zcode"] = {"request": 2000}
+            self.assertEqual(reporter.poll()["delta"], 0)
+            clock["now"] += 2; data["zcode"]["request"] += 50
+            self.assertEqual(reporter.poll()["delta"], 50)
+
+    def test_request_cache_is_bounded(self):
+        clock = {"now": 100.0}
+        reporter = TokenReporter(home=Path("unused"), clock=lambda: clock["now"])
+        reporter.MAX_TRACKED = 3
+        data = {"codex": {}, "zcode": {"a": 100, "b": 200}}
+        with patch.object(reporter, "read_counts", side_effect=lambda provider, path: data[provider]):
+            reporter.poll()
+            clock["now"] += 2; data["zcode"] = {"c": 300, "d": 400}
+            self.assertEqual(reporter.poll()["delta"], 700)
+            self.assertEqual(len(reporter.previous["zcode"]), 3)
+            clock["now"] += 2; data["zcode"] = {"d": 450, "e": 500}
+            self.assertEqual(reporter.poll()["delta"], 550)
+            self.assertEqual(len(reporter.previous["zcode"]), 3)
+
     def test_history_baseline_changes_reset_and_missing_sources(self):
         clock = {"now": 100.0}
         reporter = TokenReporter(home=Path("unused"), clock=lambda: clock["now"])

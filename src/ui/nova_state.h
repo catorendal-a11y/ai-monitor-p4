@@ -1,6 +1,7 @@
 #pragma once
 #include "ai_monitor/ai_monitor.h"
 #include "usage_format.h"
+#include "token_status.h"
 
 enum class NovaMood : uint8_t { ready, working, updated, low, critical, resting, offline, waiting, issue, greeting };
 class NovaState {
@@ -10,7 +11,7 @@ class NovaState {
   NovaMood evaluate(const aim::Snapshot& snapshot, uint32_t now, bool resting, Warning warning) const {
     if (greeted_ && now - greetedMs_ < 2200u) return NovaMood::greeting;
     if (!snapshot.hostPresent) return NovaMood::offline;
-    const bool tokenSignalFresh = snapshot.tokenUsageKnown && now - snapshot.tokenActivityMs < 15000u;
+    const bool tokenSignalFresh = token_signal_fresh(snapshot, now);
     bool hasFresh = false, low = false, critical = false, issue = false;
     for (size_t v = 0; v < aim::kMaxViews; ++v) {
       if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;

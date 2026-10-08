@@ -589,6 +589,26 @@ static void nova_follows_tokens_not_screen_dimming_or_fetching() {
   CHECK(core.snapshot().tokenIdleSeconds == 0);
 }
 
+static void token_presentation_handles_stale_sources_large_counts_and_wraparound() {
+  aim::Snapshot snapshot{}; snapshot.hostPresent = snapshot.tokenUsageKnown = snapshot.tokenUsageSeen = true;
+  snapshot.tokenSourceMask = 3; snapshot.tokenActivityMs = 0xfffffff0u; snapshot.tokenIdleSeconds = 2;
+  char value[128];
+  CHECK(token_signal_fresh(snapshot, 16));
+  CHECK(std::string(token_tracking_label(snapshot, 16)) == "TRACKING / Codex + ZCode");
+  token_activity_hint(snapshot, 1016, value, sizeof(value));
+  CHECK(std::string(value).find("Last increase: 3 s ago") == 0);
+  CHECK(std::string(token_tracking_label(snapshot, 15000)) == "TRACKING / signal lost");
+  snapshot.tokenUsageKnown = false;
+  CHECK(std::string(token_tracking_label(snapshot, 16)) == "TRACKING / no counters");
+  snapshot.hostPresent = false;
+  CHECK(std::string(token_tracking_label(snapshot, 16)) == "TRACKING / PC host offline");
+  format_token_count(999, value, sizeof(value)); CHECK(std::string(value) == "999");
+  format_token_count(1000, value, sizeof(value)); CHECK(std::string(value) == "1.0K");
+  format_token_count(1999, value, sizeof(value)); CHECK(std::string(value) == "1.9K");
+  format_token_count(UINT64_MAX, value, sizeof(value)); CHECK(std::string(value) == "18.4E");
+  char small[4]; format_token_count(UINT64_MAX, small, sizeof(small)); CHECK(small[3] == '\0');
+}
+
 int main() {
   timestamp_and_ack();
   invalid_frame_keeps_snapshot();
@@ -618,6 +638,7 @@ int main() {
   night_time_components_and_midnight_wrap();
   nova_activity_and_mood_are_based_on_real_data();
   nova_follows_tokens_not_screen_dimming_or_fetching();
+  token_presentation_handles_stale_sources_large_counts_and_wraparound();
   if (failures) { std::cerr << failures << " failed checks\n"; return EXIT_FAILURE; }
-  std::cout << "28 protocol, token-driven NOVA, quota notification, dimming, precision, night and history scenarios passed\n";
+  std::cout << "29 protocol, token-driven NOVA, quota notification, dimming, precision, night and history scenarios passed\n";
 }

@@ -1,11 +1,13 @@
 """Read numeric local token counters only. No chat content or credentials."""
 import sqlite3
 from contextlib import closing
+from collections import OrderedDict
 import time
 from pathlib import Path
 
 
 class TokenReporter:
+    MAX_TRACKED = 8192  # Keep recent IDs across temporarily missing/evicted query rows.
     def __init__(self, home=None, clock=None):
         home = Path.home() if home is None else Path(home)
         self.paths = {"codex": home / ".codex/state_5.sqlite", "zcode": home / ".zcode/cli/db/db.sqlite"}
@@ -48,7 +50,13 @@ class TokenReporter:
                     # Codex forks/imports can contain history on first sight. Baseline new thread IDs.
                     old = previous.get(key, value if provider == "codex" else 0)
                     delta += max(0, value - old)
-            self.previous[provider] = dict(counts)
+            history = previous if previous is not None else OrderedDict()
+            for key, value in counts.items():
+                history[key] = value
+                history.move_to_end(key)
+            while len(history) > self.MAX_TRACKED:
+                history.popitem(last=False)
+            self.previous[provider] = history
         if delta:
             self.last_use = now
         idle = max(0, int(now - (self.last_use if self.last_use is not None else self.started)))

@@ -16,6 +16,7 @@
 namespace nova_ui {
 static lv_obj_t *screen = nullptr, *dashboard = nullptr, *stage = nullptr, *figure = nullptr;
 static lv_obj_t *title = nullptr, *subtitle = nullptr, *hint = nullptr, *clock = nullptr, *link = nullptr;
+static lv_obj_t* tracking = nullptr;
 static lv_obj_t *updateButton = nullptr, *updateLabel = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 struct ProviderCard {
   lv_obj_t *card = nullptr, *icon = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
@@ -96,6 +97,7 @@ void init() {
   label(screen, 474, 100, 302, "RIGHT NOW", &lv_font_montserrat_12, ui_theme::accent);
   title = label(screen, 474, 129, 302, "Waiting", &lv_font_montserrat_28);
   subtitle = label(screen, 474, 174, 302, "Waiting for provider data", &lv_font_montserrat_16, ui_theme::muted);
+  tracking = label(screen, 474, 205, 302, "TRACKING / no counters", &lv_font_montserrat_12, ui_theme::muted);
   for (size_t i = 0; i < 2; ++i) {
     auto& item = providers[i];
     item.card = lv_obj_create(screen); lv_obj_set_pos(item.card, 470, 236 + i * 82); lv_obj_set_size(item.card, 310, 76);
@@ -138,10 +140,12 @@ void update() {
   char tokenMessage[96];
   const lv_image_dsc_t* pose = &nova_assets::work;
   switch (mood) {
-    case NovaMood::working:
+    case NovaMood::working: {
       heading = "Working";
-      snprintf(tokenMessage, sizeof(tokenMessage), "%llu tokens recently", static_cast<unsigned long long>(snapshot.lastTokenDelta));
+      char count[24]; format_token_count(snapshot.lastTokenDelta, count, sizeof(count));
+      snprintf(tokenMessage, sizeof(tokenMessage), "+%s registered tokens", count);
       message = tokenMessage; break;
+    }
     case NovaMood::updated: heading = "Nice work"; message = "Token activity has paused"; pose = &nova_assets::done; break;
     case NovaMood::low: heading = "Low energy"; message = "A quota window is low"; pose = &nova_assets::low; break;
     case NovaMood::critical: heading = "Low energy"; message = "A quota window is critical"; pose = &nova_assets::critical; break;
@@ -150,7 +154,7 @@ void update() {
     case NovaMood::waiting: heading = "Waiting"; message = "No fresh quota yet"; pose = &nova_assets::sleep; break;
     case NovaMood::issue: heading = "Needs attention"; message = "Tap a provider for details"; pose = &nova_assets::low; break;
     case NovaMood::greeting: heading = "Hi there!"; message = "Ready when you are"; pose = &nova_assets::done; break;
-    case NovaMood::ready: if (!snapshot.tokenUsageKnown) message = "Token counters unavailable"; break;
+    case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
   }
   if ((mood == NovaMood::ready || mood == NovaMood::working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
   if (pose != drawnPose) { drawnPose = pose; lv_image_set_src(figure, pose); }
@@ -163,6 +167,8 @@ void update() {
   }
   text(title, heading); text(subtitle, message);
   uint16_t minutes = 0; char value[128];
+  text(tracking, token_tracking_label(snapshot, now));
+  token_activity_hint(snapshot, now, value, sizeof(value)); text(hint, value);
   if (local_minutes(snapshot, now, minutes)) snprintf(value, sizeof(value), "%02u:%02u", minutes / 60, minutes % 60);
   else snprintf(value, sizeof(value), "--:--");
   text(clock, value);
@@ -213,7 +219,7 @@ void update() {
     text(item.percent, value);
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.notice ? "ERROR / last good" :
-                          (!hasRow ? "Waiting for data" : (!fresh ? "STALE / last good" : row.title)));
+                          (view.fetching ? "UPDATING / last good" : (!hasRow ? "Waiting for data" : (!fresh ? "STALE / last good" : row.title))));
     text(item.status, status);
   }
 }

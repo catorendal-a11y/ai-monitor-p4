@@ -17,6 +17,22 @@ host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 
 
+class PortSelectionTests(unittest.TestCase):
+    def test_multiple_boards_require_explicit_port(self):
+        ports = [Mock(device="COM4", vid=0x303A), Mock(device="COM6", vid=0x303A)]
+        with patch.object(host.list_ports, "comports", return_value=ports), patch.object(host, "LOG") as log:
+            self.assertIsNone(host.find_port("auto"))
+            self.assertIn("explicit port", log.call_args.args[0])
+            self.assertEqual(host.find_port("COM6"), "COM6")
+
+    def test_single_board_ignores_other_usb_devices_and_duplicates(self):
+        ports = [Mock(device="COM4", vid=0x1234), Mock(device="COM6", vid=0x303A), Mock(device="COM6", vid=0x303A)]
+        with patch.object(host.list_ports, "comports", return_value=ports):
+            self.assertEqual(host.find_port("auto"), "COM6")
+        with patch.object(host.list_ports, "comports", return_value=[]):
+            self.assertIsNone(host.find_port("auto"))
+
+
 class FakeSerial:
     def __init__(self, chunks=()):
         self.chunks = list(chunks)

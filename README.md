@@ -2,7 +2,7 @@
 
 A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4 4.3-inch touchscreen**. A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
 
-Release: **v1.9.2**. The interface, code comments and documentation are in English.
+Release: **v1.10.0**. The interface, code comments and documentation are in English.
 
 ## Features
 
@@ -12,6 +12,7 @@ Release: **v1.9.2**. The interface, code comments and documentation are in Engli
 - Configurable quota warnings, critical alerts and dismiss/rearm behavior.
 - Backlight presets, gradual idle dimming, night scheduling with hour/minute controls, and persistent settings with save feedback.
 - USB heartbeat, reconnect handling, last-valid data during API errors, and rate-limit backoff.
+- Visible token-source tracking, signal-loss feedback and time since the last registered increase.
 
 ## Hardware and toolchain
 
@@ -68,7 +69,7 @@ Use [tools/aim_host.example.json](tools/aim_host.example.json) as the shareable 
 
 | Setting | Meaning |
 | --- | --- |
-| `port` | `auto` selects an Espressif serial device. Select an explicit port when multiple boards are connected. |
+| `port` | `auto` connects only when exactly one Espressif port is found. With multiple boards, set an explicit port; the host logs the candidates and waits. |
 | `interval_s` | API interval from 15 to 240 seconds; default 240. Valid configuration edits are applied while running. |
 | `zai_provider` | Keep `zcode`. |
 | `zai_key` | Optional local coding-plan credential; empty in the example. Prefer environment variable `ZAI_API_KEY`, which takes precedence. |
@@ -85,6 +86,10 @@ NOVA follows **increases in local numeric token counters**, independently of key
 - ZCode: `model_usage.computed_total_tokens` in `~/.zcode/cli/db/db.sqlite`.
 
 The companion uses read-only SQLite connections and reads numeric counters plus identifiers, not conversations. It checks approximately every two seconds, including during API requests. Existing totals establish a baseline and do not count as new activity.
+
+NOVA's TRACKING line names the currently readable sources, not which application generated the last increase. The robot caption shows elapsed time since the last increase. Large increments use compact units (K/M/B and higher, truncated to one decimal); the USB info response retains the exact count. Unavailable or stale signals are shown explicitly. Quota cards distinguish updates in progress from stale measurements.
+
+The host retains up to 8,192 recently observed IDs per source so temporarily absent query rows do not immediately count as new consumption on their return. This bounded cache is session-local; IDs evicted from it cannot retain that protection. Changes to local database schemas may require adapter updates.
 
 Observed token consumption takes priority over NOVA's low-quota expression; quota bars and warning banners still report low/critical limits. After 90 seconds without a new registered increase, NOVA briefly celebrates the pause and becomes ready; after five minutes it may rest. Dimming does not prove inactivity. Missing or stale activity signals do not prove rest.
 
