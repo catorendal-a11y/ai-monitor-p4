@@ -1,0 +1,53 @@
+# Build products, dependencies, and local test output
+.pio/
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+work/
+outputs/
+*.bin
+*.elf
+*.map
+*.ppm
+
+# Host configuration and credentials stay on the local machine
+tools/aim_host.json
+.env
+.env.*
+!.env.example
+auth.json
+credentials.json
+secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+.codex/
+.zcode/
+
+# Runtime records may contain private account or activity information
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.jsonl
+*.log
+*.log.*
+*.lock
+
+# Personal shortcuts, editor state, and operating-system files
+*.lnk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+*~

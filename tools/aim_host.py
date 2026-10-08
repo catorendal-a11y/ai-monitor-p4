@@ -1,0 +1,819 @@
+# AI Monitor P4 host - feeds the panel with REAL provider usage.
+#
+# Sources:
+#   codex : ChatGPT backend usage endpoint, authenticated with the local
+#           Codex CLI login (~/.codex/auth.json). Same data the Codex CLI
+#           shows in /status (5h primary window + weekly secondary window).
+#   zcode : Z.AI GLM coding plan quota (api.z.ai/api/monitor/usage/quota/limit),
+#           enabled with ZAI_API_KEY or aim_host.json ("zai_key").
+#           ZCode encrypts its own credentials at rest, so the
+#           key must come from the Z.AI console.
+#
+# Output: esp32-ai-monitor protocol frames (AIM1 framing) over the panel's
+# USB CDC port. Default poll interval 240 s, auto re-detects the COM port.
+#
+# Usage:  python aim_host.py   (config file next to this script)
+
+import json
+import math
+import os
+import ssl
+import sys
+import time
+import urllib.request
+import urllib.error
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from token_activity import TokenReporter
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+
+import serial
+from serial.tools import list_ports
+
+HERE = Path(__file__).resolve().parent
+CONFIG_PATH = HERE / "aim_host.json"
+CODEX_AUTH = Path.home() / ".codex" / "auth.json"
+MAX_FRAME_BYTES = 4095
+HEARTBEAT_SECONDS = 10
+MAX_RESPONSE_BYTES = 65536
+
+
+class CredentialError(ValueError):
+    pass
+
+
+def credential(value, optional=False):
+    if not isinstance(value, str):
+        raise CredentialError("Invalid credential format")
+    value = value.strip()
+    if not value and optional:
+        return ""
+    if not value or any(not 33 <= ord(character) <= 126 for character in value):
+        raise CredentialError("Credentials must be a single printable token")
+    return value
+
+
+def read_json_response(response):
+    raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise ValueError("API response exceeds size limit")
+    data = json.loads(raw.decode("utf-8-sig"))
+    if not isinstance(data, dict):
+        raise ValueError("API response must be an object")
+    return data
+
+
+def window_minutes(seconds):
+    if seconds is None:
+        return 0
+    if isinstance(seconds, bool):
+        raise ValueError("Invalid window duration")
+    seconds = float(seconds)
+    if not math.isfinite(seconds) or seconds < 0 or seconds / 60 > 0xffffffff:
+        raise ValueError("Invalid window duration")
+    return int(seconds // 60)
+
+
+def provider_failure(provider, error):
+    # Header/JSON exceptions may contain credentials or server response text.
+    # Return a category without copying exception details to the display/log.
+    if isinstance(error, CredentialError):
+        return f"{provider}: invalid login or API key"
+    if isinstance(error, FileNotFoundError):
+        return f"{provider}: login file not found"
+    if isinstance(error, (ValueError, TypeError, KeyError, AttributeError)):
+        return f"{provider}: invalid response data"
+    if isinstance(error, OSError):
+        return f"{provider}: connection failed; retrying"
+    return f"{provider}: request failed; retrying"
+
+
+LOG_PATH = HERE / "aim_host.log"
+
+
+def LOG(msg):
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    if sys.stdout is not None:
+        print(line, flush=True)
+    try:
+        if LOG_PATH.exists() and LOG_PATH.stat().st_size >= 1_000_000:
+            os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
+DEFAULT_CONFIG = {
+    "port": "auto",       # "auto" = detect Espressif USB CDC, or e.g. "COM6"
+    # 240 s: usage endpoints are free status endpoints (no model quota
+    # consumed), but polling stays polite; the panel's LIVE badge tolerates
+    # up to 5 min between frames.
+    "interval_s": 240,
+    "zai_key": "",        # paste a Z.AI coding plan API key here to enable Z CODE
+    "zai_provider": "zcode"
+}
+
+
+LOCK_PATH = HERE / "aim_host.lock"
+_lock_handle = None
+
+
+def acquire_lock():
+    """OS-owned lock: atomic between processes and released automatically on exit."""
+    global _lock_handle
+    if _lock_handle is not None:
+        return False
+    handle = LOCK_PATH.open("a+b")
+    handle.seek(0, 2)
+    if handle.tell() == 0:
+        handle.write(b" ")
+        handle.flush()
+    handle.seek(0)
+    try:
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return False
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()).encode("ascii"))
+    handle.flush()
+    _lock_handle = handle
+    return True
+
+
+def release_lock():
+    global _lock_handle
+    if _lock_handle is not None:
+        _lock_handle.close()
+        _lock_handle = None
+    # Keep the file: unlinking it could let another process lock a different inode.
+
+
+def load_config():
+    if CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in {CONFIG_PATH.name}: line {exc.lineno}") from exc
+    else:
+        cfg = {}
+    if not isinstance(cfg, dict):
+        raise ValueError("aim_host.json must contain a JSON object")
+    out = dict(DEFAULT_CONFIG)
+    out.update(cfg)
+    if not isinstance(out["port"], str) or not out["port"].strip():
+        raise ValueError("port must be 'auto' or a serial port name")
+    out["port"] = out["port"].strip()
+    if not isinstance(out["interval_s"], int) or isinstance(out["interval_s"], bool):
+        raise ValueError("interval_s must be an integer")
+    if not 15 <= out["interval_s"] <= 240:
+        raise ValueError("interval_s must be between 15 and 240 (panel freshness limit)")
+    if out["zai_provider"] != "zcode":
+        raise ValueError("zai_provider must be 'zcode'")
+    if not isinstance(out["zai_key"], str):
+        raise ValueError("zai_key must be a string")
+    out["zai_key"] = credential(os.environ.get("ZAI_API_KEY", out["zai_key"]), optional=True)
+    # Keep existing configuration and credentials untouched at startup.
+    if not CONFIG_PATH.exists():
+        CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, indent=2), encoding="utf-8")
+    return out
+
+
+def now_iso_epoch(epoch_s):
+    return datetime.fromtimestamp(epoch_s, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def percent_value(value):
+    if value is None or isinstance(value, bool):
+        raise ValueError("Missing usage percentage")
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        raise ValueError("Invalid usage percentage")
+    return number
+
+
+class ProviderNotice(str):
+    def __new__(cls, message, retry_after=0):
+        value = super().__new__(cls, message)
+        value.retry_after = retry_after
+        return value
+
+
+def retry_after_seconds(headers):
+    value = headers.get("Retry-After") if headers else None
+    if not isinstance(value, str):
+        return 0
+    try:
+        seconds = int(value) if value.strip().isdigit() else math.ceil(parsedate_to_datetime(value).timestamp() - time.time())
+        return max(0, min(86400, seconds))
+    except (ValueError, TypeError, OverflowError, OSError):
+        return 0
+
+
+def http_notice(provider, error):
+    delay = retry_after_seconds(error.headers)
+    if error.code in (401, 403):
+        return ProviderNotice(f"{provider}: check login or API key", delay)
+    if error.code == 429:
+        return ProviderNotice(f"{provider}: rate limited; retrying", delay)
+    return ProviderNotice(f"{provider}: HTTP {error.code}; retrying", delay)
+
+
+class ProviderRetries:
+    """Monotonic, independent cooldowns survive USB reconnections."""
+    def __init__(self, interval=240):
+        self.interval = interval
+        self.states = {}
+
+    def remaining(self, provider):
+        state = self.states.get(provider)
+        return max(0, math.ceil(state[1] - time.monotonic())) if state else 0
+
+    def deferred_notice(self, provider):
+        return f"{provider}: retry in {self.remaining(provider)} s. {self.states[provider][2]}"
+
+    def failed(self, provider, notice):
+        failures = min(9, self.states.get(provider, (0, 0, ""))[0] + 1)
+        delay = max(min(3600, max(15, self.interval) * 2 ** (failures - 1)),
+                    getattr(notice, "retry_after", 0))
+        self.states[provider] = (failures, time.monotonic() + delay, str(notice))
+
+    def succeeded(self, provider):
+        self.states.pop(provider, None)
+
+
+def reset_display(value, minutes=0):
+    """Use the PC's local timezone, retaining dates for long quota windows."""
+    if not value:
+        return ""
+    try:
+        reset = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone()
+    except (ValueError, TypeError, AttributeError):
+        return str(value)[:19]
+    return reset.strftime("%d %b %H:%M" if minutes >= 1440 else "%H:%M")
+
+
+def zai_reset_iso(value):
+    if not value:
+        return ""
+    try:
+        milliseconds = float(value)
+    except (ValueError, TypeError):
+        return str(value)
+    try:
+        return now_iso_epoch(milliseconds / 1000.0)
+    except (ValueError, OverflowError, OSError):
+        return ""
+
+
+def clock_fields():
+    local = datetime.now().astimezone()
+    return {
+        "time": local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "displayTime": local.strftime("%H:%M"),
+        "displaySeconds": local.second,
+        "tzOffsetMinutes": int(local.utcoffset().total_seconds() // 60),
+    }
+
+
+def reset_seconds(value, epoch_now=None):
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        reset = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if reset.tzinfo is None:
+            return None
+        remaining = math.ceil(reset.timestamp() - (time.time() if epoch_now is None else epoch_now))
+        return max(0, min(0xffffffff - 60, remaining))
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# PROVIDER FETCHES - each returns (rows, notice) or None on failure
+# ───────────────────────────────────────────────────────────────────────────────
+_ctx = ssl.create_default_context()
+
+
+def fetch_codex():
+    """Codex (ChatGPT plan) usage via the local Codex CLI login token."""
+    try:
+        auth = json.loads(CODEX_AUTH.read_text(encoding="utf-8-sig"))
+        access = (auth.get("tokens") or {}).get("access_token")
+        if not access:
+            return None, "Codex: no access_token in auth.json"
+        access = credential(access)
+        req = urllib.request.Request("https://chatgpt.com/backend-api/wham/usage")
+        req.add_header("Authorization", "Bearer " + access)
+        req.add_header("User-Agent", "codex_cli_rs/0.159.3")
+        with urllib.request.urlopen(req, timeout=20, context=_ctx) as r:
+            data = read_json_response(r)
+        rl = data.get("rate_limit") or {}
+        rows = []
+        pw = rl.get("primary_window") or {}
+        if pw:
+            rows.append({
+                "title": "Session",
+                "usedPercent": percent_value(pw.get("used_percent")),
+                "resetsAt": now_iso_epoch(pw["reset_at"]) if pw.get("reset_at") else "",
+                "windowMinutes": window_minutes(pw.get("limit_window_seconds")),
+            })
+        sw = rl.get("secondary_window") or {}
+        if sw:
+            minutes = window_minutes(sw.get("limit_window_seconds"))
+            rows.append({
+                "title": "Week" if minutes == 10080 else "Secondary",
+                "usedPercent": percent_value(sw.get("used_percent")),
+                "resetsAt": now_iso_epoch(sw["reset_at"]) if sw.get("reset_at") else "",
+                "windowMinutes": minutes,
+            })
+        if not rows:
+            return None, "Codex: no rate_limit windows in response"
+        return rows, None
+    except urllib.error.HTTPError as error:
+        return None, http_notice("Codex", error)
+    except Exception as e:
+        return None, provider_failure("Codex", e)
+
+
+def fetch_zcode(api_key):
+    """Z.AI GLM coding plan quota. Auth: raw key, NO Bearer prefix."""
+    try:
+        api_key = credential(api_key)
+        req = urllib.request.Request("https://api.z.ai/api/monitor/usage/quota/limit")
+        req.add_header("Authorization", api_key.strip())
+        req.add_header("Accept-Language", "en-US,en")
+        with urllib.request.urlopen(req, timeout=20, context=_ctx) as r:
+            data = read_json_response(r)
+        success, code = data.get("success"), data.get("code")
+        if success is not None and type(success) is not bool:
+            raise ValueError("Invalid success flag")
+        accepted_code = type(code) is int and code in (0, 200)
+        accepted = success is not False and (success is True or accepted_code) and (code is None or accepted_code)
+        if not accepted:
+            code = data.get("code")
+            if type(code) is int and code in (401, 403):
+                return None, "Z.AI: check login or API key"
+            if type(code) is int and code == 429:
+                return None, "Z.AI: rate limited; retrying"
+            return None, "Z.AI: request rejected"
+        limits = ((data.get("data") or {}).get("limits")) or []
+        rows = []
+        for lim in limits:
+            # Current API: CREDIT_LIMIT with unit 3 = 5h window, unit 6 = monthly.
+            # (Older clients saw TOKENS_LIMIT; accept both.)
+            if lim.get("type") not in ("CREDIT_LIMIT", "TOKENS_LIMIT"):
+                continue
+            unit = lim.get("unit")
+            if unit == 6:
+                title, minutes = "Monthly", 43200
+            elif unit == 3:
+                title, minutes = "Session", 300
+            else:
+                title, minutes = "Quota", 0
+            reset = lim.get("nextResetTime") or lim.get("resetAt")
+            reset_iso = zai_reset_iso(reset)
+            rows.append({
+                "title": title,
+                "usedPercent": percent_value(lim.get("percentage")),
+                "resetsAt": reset_iso,
+                "windowMinutes": minutes,
+            })
+        if not rows:
+            return None, "Z.AI: no quota entries"
+        return rows, None
+    except urllib.error.HTTPError as error:
+        return None, http_notice("Z.AI", error)
+    except Exception as e:
+        return None, provider_failure("Z.AI", e)
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# PANEL LINK (esp32-ai-monitor protocol)
+# ───────────────────────────────────────────────────────────────────────────────
+def find_port(preferred):
+    if preferred and preferred != "auto":
+        return preferred
+    try:
+        ports = sorted(port.device for port in list_ports.comports() if port.vid == 0x303A)
+        return ports[0] if ports else None
+    except Exception as e:
+        LOG(f"port scan failed: {e}")
+        return None
+
+
+class Panel:
+    def __init__(self, port_name):
+        self.ser = serial.Serial(port_name, 115200, timeout=0.2, write_timeout=2)
+        self.name = port_name
+        self._rx = bytearray()
+        self.boot_id = None
+        self.last_uptime = None
+        self.refresh_request_id = None
+        self.last_poll_success = True
+        self.retries = ProviderRetries()
+        self.cycle_active = False
+        self.active_refresh_id = None
+        self.cycle_deadline = None
+        self.activity_supported = False
+        self.tokens_supported = False
+        self.token_reporter = None
+
+    def close(self):
+        self.ser.close()
+
+    def refresh_status(self, request_id, state, message):
+        self.send_line(json.dumps({"cmd": "refresh_status", "requestId": request_id, "state": state, "message": message}))
+
+    def take_refresh_request(self):
+        request_id = self.refresh_request_id
+        self.refresh_request_id = None
+        return request_id
+
+    def activity(self, state, message):
+        if self.activity_supported:
+            self.send_line(json.dumps({"cmd": "host_activity", "state": state, "message": message}))
+
+    def handle_event(self, message):
+        request_id = message.get("requestId")
+        if message.get("type") != "refresh_request" or type(request_id) is not int or not 0 < request_id <= 0xffffffff:
+            return False
+        if self.cycle_active:
+            self.active_refresh_id = request_id
+            self.refresh_status(request_id, "updating", "Joining the current provider update")
+        else:
+            self.refresh_request_id = request_id
+            self.refresh_status(request_id, "waiting", "Queued; API polling cooldown is 15 s")
+        return True
+
+    def collect_requests(self):
+        while self.ser.in_waiting:
+            self._rx.extend(self.ser.read(min(512, self.ser.in_waiting)))
+            if len(self._rx) > 16384:
+                raise RuntimeError("Panel reply exceeds receive buffer")
+        while b"\n" in self._rx:
+            line, _, rest = self._rx.partition(b"\n")
+            self._rx = bytearray(rest)
+            try:
+                message = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if isinstance(message, dict):
+                self.handle_event(message)
+
+    def heartbeat(self):
+        fields = dict(clock_fields(), cmd="get_info", heartbeat=True, manualRefresh=True)
+        self.send_line(json.dumps(fields))
+        info = self.wait_for("info")
+        self.activity_supported = info.get("hostActivity") is True
+        self.tokens_supported = info.get("tokenActivity") is True
+        boot_id, uptime = info.get("bootId"), info.get("uptime")
+        if self.boot_id is not None and boot_id != self.boot_id:
+            raise ConnectionResetError("Panel restarted; restoring views")
+        if self.boot_id is None and self.last_uptime is not None and uptime is not None and uptime < self.last_uptime:
+            raise ConnectionResetError("Panel uptime reset; restoring views")
+        self.boot_id, self.last_uptime = boot_id, uptime
+
+    def report_tokens(self):
+        if self.tokens_supported and isinstance(self.token_reporter, TokenReporter):
+            message = self.token_reporter.poll()
+            if message is not None:
+                self.send_line(json.dumps(message))
+
+    def _write(self, data):
+        if self.ser.write(data) != len(data):
+            raise serial.SerialTimeoutException("Incomplete serial write")
+
+    def send_line(self, line):
+        self._write(line.encode("utf-8") + b"\n")
+
+    def send_frame(self, payload, frame_id):
+        raw = payload.encode("utf-8")
+        if not 0 < len(raw) <= MAX_FRAME_BYTES:
+            raise ValueError(f"Frame must contain 1..{MAX_FRAME_BYTES} bytes")
+        self._write(b"AIM1 %d %d\n" % (len(raw), frame_id) + raw + b"\n")
+
+    def wait_for(self, message_type, seconds=2.0, frame_id=None, command=None):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            while b"\n" in self._rx:
+                line, _, rest = self._rx.partition(b"\n")
+                self._rx = bytearray(rest)
+                try:
+                    message = json.loads(line)
+                except (ValueError, UnicodeDecodeError):
+                    continue  # boot messages and debug logs
+                if not isinstance(message, dict):
+                    continue
+                if self.handle_event(message):
+                    continue
+                if frame_id is not None and message.get("frameId") != frame_id:
+                    continue
+                if message.get("type") == "error":
+                    if frame_id is None and "frameId" in message:
+                        continue
+                    raise RuntimeError(message.get("message", "Panel rejected request"))
+                if command is not None and message.get("cmd") != command:
+                    continue
+                if message.get("type") == message_type:
+                    return message
+            chunk = self.ser.read(512)
+            if chunk:
+                self._rx.extend(chunk)
+                if len(self._rx) > 16384:
+                    raise RuntimeError("Panel reply exceeds receive buffer")
+        raise TimeoutError(f"{self.name}: no {message_type} reply")
+
+
+def connect_panel(port_name, views):
+    panel = Panel(port_name)
+    try:
+        time.sleep(0.5)
+        panel.heartbeat()
+        panel.send_line(json.dumps({"cmd": "set_views", "views": views, "mode": "manual",
+                                    "interval": 10, "active": 0}))
+        panel.wait_for("ok", command="set_views")
+        return panel
+    except BaseException:
+        panel.close()
+        raise
+
+
+class FetchPool:
+    """API workers never access USB; the calling thread remains its sole owner."""
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="aim-api")
+        self.pending = {}
+
+    def close(self):
+        self.executor.shutdown(wait=False, cancel_futures=True)
+
+    def fetch(self, provider, callback, panel):
+        old = self.pending.get(provider)
+        if old is not None and not old.done():
+            return None, f"{provider}: previous request still running"
+        future = self.executor.submit(callback)
+        self.pending[provider] = future
+        started = last_heartbeat = time.monotonic()
+        try:
+            while True:
+                try:
+                    return future.result(timeout=0.1)
+                except FutureTimeout:
+                    if future.done():
+                        return None, provider_failure(provider, future.exception())
+                    panel.collect_requests()
+                    if isinstance(panel, Panel): panel.report_tokens()
+                    now = time.monotonic()
+                    if now - last_heartbeat >= HEARTBEAT_SECONDS:
+                        panel.heartbeat(); last_heartbeat = now
+                    cycle_deadline = getattr(panel, "cycle_deadline", None)
+                    cycle_expired = type(cycle_deadline) in (int, float) and now >= cycle_deadline
+                    if now - started >= 25 or cycle_expired:
+                        future.cancel()
+                        return None, f"{provider}: request timed out; retrying"
+                except Exception as error:
+                    return None, provider_failure(provider, error)
+        except BaseException:
+            future.cancel()
+            raise
+
+
+class ConfigWatcher:
+    def __init__(self):
+        self.signature = self.fingerprint()
+        self.pending = None
+
+    @staticmethod
+    def fingerprint():
+        try:
+            stat = CONFIG_PATH.stat()
+            return stat.st_mtime_ns, stat.st_size
+        except OSError:
+            return None
+
+    def check(self):
+        signature = self.fingerprint()
+        if signature == self.signature:
+            return
+        self.signature = signature
+        if signature is None:
+            LOG("Configuration file unavailable; keeping previous settings")
+            return
+        try:
+            self.pending = load_config()
+        except (ValueError, OSError):
+            LOG("Configuration reload rejected; keeping previous settings")
+
+    def take(self):
+        value, self.pending = self.pending, None
+        return value
+
+
+def wait_connected(panel, seconds, minimum_wait=0):
+    deadline = time.monotonic() + seconds
+    refresh_after = time.monotonic() + minimum_wait
+    next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(1, remaining))
+        panel.collect_requests()
+        if isinstance(panel, Panel): panel.report_tokens()
+        watcher = getattr(panel, "config_watcher", None)
+        if isinstance(watcher, ConfigWatcher):
+            watcher.check()
+            if watcher.pending is not None and time.monotonic() >= refresh_after:
+                return
+        if type(panel.refresh_request_id) is int and time.monotonic() >= refresh_after:
+            return
+        if time.monotonic() >= next_heartbeat and time.monotonic() < deadline:
+            panel.heartbeat()
+            next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
+
+
+def frame_payload(provider, view_index, rows, notice=None):
+    data0 = {"source": "aim-host", "provider": provider, "fetching": False, "viewIndex": view_index}
+    if notice:
+        data0["notice"] = notice
+    else:
+        # The panel shows how much quota is LEFT (the user finds remaining
+        # more convenient than used). percentMode "remaining" tells the
+        # device the numbers are complements: 95 means 95% left.
+        shown = []
+        for row in rows[:3]:
+            used = percent_value(row["usedPercent"])
+            shown.append(dict(row, usedPercent=max(0.0, min(100.0, 100.0 - used)),
+                              resetsAt=reset_display(row.get("resetsAt"), row.get("windowMinutes", 0))))
+            countdown = reset_seconds(row.get("resetsAt"))
+            if countdown is not None:
+                shown[-1]["resetSeconds"] = countdown
+        data0["usage"] = {"rows": shown, "percentMode": "remaining"}
+    envelope = {
+        "schemaVersion": 1,
+        "frameId": 0,  # replaced by caller
+        **clock_fields(),
+        "data": [data0],
+    }
+    return json.dumps(envelope, allow_nan=False)
+
+
+def run(cfg):
+    interval = cfg["interval_s"]
+    zai_key = cfg.get("zai_key", "")
+    zai_provider = cfg.get("zai_provider", "zcode")
+    views = ["codex"] + ([zai_provider] if zai_key else [])
+
+    try:
+        _run_loop(cfg, interval, zai_key, views)
+    except KeyboardInterrupt:
+        LOG("Host stopped")
+
+
+def _run_loop(cfg, interval, zai_key, views):
+    panel = None
+    frame_id = 100
+    retries = ProviderRetries(interval)
+    fetcher = FetchPool()
+    watcher = ConfigWatcher()
+    tokens = TokenReporter()
+    try:
+        while True:
+            watcher.check()
+            changed_config = watcher.take()
+            if changed_config is not None:
+                previous = cfg
+                cfg = changed_config
+                interval = cfg["interval_s"]
+                zai_key = cfg.get("zai_key", "")
+                changed_views = ["codex"] + ([cfg["zai_provider"]] if zai_key else [])
+                retries.interval = interval
+                if previous.get("zai_key") != zai_key:
+                    retries.succeeded("zcode")
+                if cfg["port"] != previous["port"] or changed_views != views:
+                    if panel is not None: panel.close()
+                    panel = None
+                views = changed_views
+                LOG("Validated configuration changes applied")
+            if panel is None:
+                port_name = find_port(cfg["port"])
+                if not port_name:
+                    LOG("no Espressif serial port found, retrying in 30 s")
+                    time.sleep(30)
+                    continue
+                try:
+                    panel = connect_panel(port_name, views)
+                    panel.retries = retries
+                    panel.fetcher = fetcher
+                    panel.config_watcher = watcher
+                    panel.token_reporter = tokens
+                    panel.report_tokens()
+                    LOG(f"connected to {port_name}, views={views}")
+                except Exception as exc:
+                    LOG(f"open {port_name} failed: {exc}")
+                    time.sleep(5)
+                    continue
+            try:
+                cycle_started = time.monotonic()
+                panel.cycle_deadline = cycle_started + 45
+                request_id = panel.take_refresh_request()
+                if type(request_id) is not int:
+                    request_id = None
+                panel.cycle_active = True
+                panel.active_refresh_id = request_id
+                panel.activity("fetching", "Fetching provider data")
+                if request_id is not None:
+                    panel.refresh_status(request_id, "updating", "Fetching latest provider data")
+                frame_id = poll_cycle(cfg, zai_key, views, frame_id, panel)
+                panel.collect_requests()
+                panel.cycle_active = False
+                panel.activity("updated" if panel.last_poll_success is True else "failed",
+                               "Latest quota received" if panel.last_poll_success is True else "Check provider details")
+                request_id = panel.active_refresh_id
+                if type(request_id) is not int: request_id = None
+                if request_id is not None:
+                    successful = panel.last_poll_success is True
+                    panel.refresh_status(request_id, "complete" if successful else "failed",
+                                         "Data updated" if successful else "A provider is unavailable; check its card")
+                delay = max(1, interval - (time.monotonic() - cycle_started))
+                cooldown = max(0, 15 - (time.monotonic() - cycle_started))
+                wait_connected(panel, delay, minimum_wait=cooldown)
+            except Exception as exc:
+                LOG(f"panel link failed: {exc}; reconnecting")
+                panel.close()
+                panel = None
+                time.sleep(5)
+    finally:
+        fetcher.close()
+        if panel is not None:
+            panel.close()
+
+
+def poll_cycle(cfg, zai_key, views, frame_id, panel):
+    panel.last_poll_success = True
+    if not isinstance(getattr(panel, "retries", None), ProviderRetries):
+        panel.retries = ProviderRetries(cfg["interval_s"])
+    for idx, provider in enumerate(views):
+        deferred = panel.retries.remaining(provider) > 0
+        fetcher = getattr(panel, "fetcher", None)
+        if deferred:
+            rows, notice = None, panel.retries.deferred_notice(provider)
+        elif provider == "codex":
+            rows, notice = fetcher.fetch(provider, fetch_codex, panel) if isinstance(fetcher, FetchPool) else fetch_codex()
+        elif provider == cfg["zai_provider"] and zai_key:
+            callback = lambda: fetch_zcode(zai_key)
+            rows, notice = fetcher.fetch(provider, callback, panel) if isinstance(fetcher, FetchPool) else callback()
+        else:
+            rows, notice = None, f"{provider} not configured"
+        if not rows:
+            panel.last_poll_success = False
+            notice = notice or f"{provider} unavailable"
+            if not deferred:
+                panel.retries.failed(provider, notice)
+            LOG(notice)
+        # Send every cycle to keep the panel's freshness indication current.
+        frame_id = (frame_id % 999999) + 1
+        try:
+            payload = frame_payload(provider, idx, rows, notice)
+        except (ValueError, TypeError, KeyError):
+            panel.last_poll_success = False
+            notice = f"{provider}: invalid usage data"
+            panel.retries.failed(provider, notice)
+            payload = frame_payload(provider, idx, None, notice)
+        else:
+            if rows and not notice:
+                panel.retries.succeeded(provider)
+        payload = json.loads(payload)
+        payload["frameId"] = frame_id
+        panel.send_frame(json.dumps(payload, allow_nan=False), frame_id)
+        panel.wait_for("ack", seconds=2, frame_id=frame_id)
+        LOG(f"{provider}: frame {frame_id} ACK")
+    return frame_id
+
+
+def main():
+    if not acquire_lock():
+        LOG("another aim_host instance is already running - exiting")
+        return 0
+    try:
+        try:
+            cfg = load_config()
+        except (ValueError, OSError) as exc:
+            LOG(f"Configuration error: {exc}")
+            return 1
+        run(cfg)
+    finally:
+        release_lock()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

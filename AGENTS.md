@@ -1,0 +1,40 @@
+# AI Monitor P4 development
+
+## Architecture
+
+- `src/main.cpp`: task startup and UI loop.
+- `src/ai_monitor/`: bounded AIM1/JSON protocol, snapshots and USB receiver.
+- Hardware initialization: inspect display/touch sources before changing board pins.
+- `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
+- `src/ui/`: state/format/history helpers, theme and generated assets.
+- `src/app_settings.*`: validated NVS settings/save feedback.
+- `tools/aim_host.py`: polling, retries, config and USB companion.
+- `tools/token_activity.py`: read-only numeric token activity.
+- `assets/nova/`: original SVGs and logo attribution.
+- `tests/`: synthetic Python/protocol/settings/native UI regressions.
+
+## Commands
+
+Use `.venv\Scripts\python.exe` on Windows or `.venv/bin/python` elsewhere.
+
+```text
+python -m platformio run -e esp32p4-release
+python -m unittest discover -s tests -p "test_*.py"
+python scripts/run_tests.py
+python scripts/run_tests.py --ui --screenshots work/ui-previews
+```
+
+Build first to install pinned ArduinoJson/LVGL. Native tests need C++17; UI also needs C compiler, CMake and Ninja. Use `--cxx`/`--cc` for paths. Flash only when requested, after stopping the companion, using the identified upload port.
+
+## Rules
+
+- English in project-owned code, documentation and UI.
+- UI-task ownership for LVGL/backlight mutations; safe snapshot publication.
+- Bounded buffers, strict JSON type validation, frame correlation and partial writes.
+- Rollover-safe timing; no repeated NVS writes/redraws for unchanged state.
+- Local token increases are activity, not billing or streaming. Dimming does not prove inactivity.
+- Test transitions and inspect UI output. Mocks do not establish physical hardware validation.
+- Do not read/print real credentials or conversations for debugging; use synthetic fixtures.
+- Never add keys, local configs, databases, logs, shortcuts or binaries to Git.
+- Preserve bundled license texts byte-for-byte and attribution. MIT grants no trademark rights.
+- Check this project is the Git root before mutations; never stage/commit from a parent/global repository.
