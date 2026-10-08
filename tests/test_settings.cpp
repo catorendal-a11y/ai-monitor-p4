@@ -12,6 +12,17 @@ int main() {
   legacy.putUShort("night_end", 360); legacy.putUChar("night_pct", 15);
   CHECK(dim_minutes() == 5 && warning_percent() == 25);
   CHECK(night().enabled && night().start == 1200 && night().end == 360 && night().percent == 15);
+  CHECK(appearance().companion == Companion::nova && appearance().theme == Theme::forest);
+  fake_nvs::fail_write = true;
+  set_appearance({Companion::orbit, Theme::ocean}); CHECK(save_status() == SaveStatus::failed);
+  fake_nvs::fail_write = false;
+  set_appearance({Companion::orbit, Theme::ocean}); CHECK(save_status() == SaveStatus::saved);
+  const auto appearanceWrites = fake_nvs::writes;
+  set_appearance({Companion::orbit, Theme::ocean}); CHECK(fake_nvs::writes == appearanceWrites);
+  s_loaded = false; s_appearance = Appearance{};
+  CHECK(appearance().companion == Companion::orbit && appearance().theme == Theme::ocean);
+  fake_nvs::values["appear_v1"] = {255,255}; s_loaded = false;
+  CHECK(appearance().companion == Companion::nova && appearance().theme == Theme::forest);
   fake_nvs::fail_open = true;
   set_dim_minutes(1); CHECK(save_status() == SaveStatus::failed);
   CHECK(dim_minutes() == 1);  // temporary setting remains usable

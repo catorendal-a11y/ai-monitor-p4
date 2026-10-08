@@ -1,4 +1,4 @@
-// Generate fixed RGB565 robot frames and BGRA logo images from the SVG sources.
+// Generate transparent RGB565+A8 robot frames and original BGRA brand marks.
 // Run with Node.js and sharp installed; generated C++ is committed with sources.
 const fs = require('fs');
 const path = require('path');
@@ -17,15 +17,21 @@ function emit(name, pixels, width, height, format, stride) {
   cpp.push('};', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${name}_pixels), ${name}_pixels, nullptr, nullptr };`);
 }
 (async () => {
-  for (const name of names) {
-    const {data, info} = await sharp(path.join(source, name + '.svg')).removeAlpha().raw().toBuffer({resolveWithObject:true});
-    const rgb565 = Buffer.alloc(info.width * info.height * 2);
+  for (const robot of ['nova','orbit']) for (const pose of [...names,'thumb']) {
+    const name = robot === 'nova' && pose !== 'thumb' ? pose : robot + '_' + pose;
+    const file = path.resolve(source,'..',robot, (pose === 'thumb' ? 'work' : pose) + '.svg');
+    let pipeline = sharp(file);
+    if (pose === 'thumb') pipeline = pipeline.resize(144,95);
+    const {data, info} = await pipeline.ensureAlpha().raw().toBuffer({resolveWithObject:true});
+    const pixelCount = info.width * info.height;
+    const rgb565 = Buffer.alloc(pixelCount * 3);
     for (let i = 0; i < info.width * info.height; ++i) {
       const offset = i * info.channels;
       const value = (data[offset] >> 3) << 11 | (data[offset + 1] >> 2) << 5 | data[offset + 2] >> 3;
       rgb565.writeUInt16LE(value, i * 2);
+      rgb565[pixelCount * 2 + i] = data[offset + 3];
     }
-    emit(name, rgb565, info.width, info.height, 'LV_COLOR_FORMAT_RGB565', info.width * 2);
+    emit(name, rgb565, info.width, info.height, 'LV_COLOR_FORMAT_RGB565A8', info.width * 2);
   }
   for (const brand of ['openai', 'zcode']) for (const size of [24, 42, 48]) {
     const inner = brand === 'zcode' ? Math.round(size * 2 / 3) : size;
@@ -37,14 +43,17 @@ function emit(name, pixels, width, height, format, stride) {
     for (let i = 0; i < bgra.length; i += 4) { bgra[i] = data[i + 2]; bgra[i + 2] = data[i]; }
     emit(brand + size, bgra, size, size, 'LV_COLOR_FORMAT_ARGB8888', size * 4);
   }
-  header.push('const lv_image_dsc_t* logo_for(const char* provider, unsigned size);', '}');
+  header.push('const lv_image_dsc_t* logo_for(const char* provider, unsigned size);', 'const lv_image_dsc_t* companion_pose(bool orbit, const lv_image_dsc_t* novaPose);', '}');
   cpp.push('const lv_image_dsc_t* logo_for(const char* provider, unsigned size) {',
     '  if (!provider) return nullptr;',
     '  if (strcmp(provider, "codex") == 0) return size == 24 ? &openai24 : (size == 42 ? &openai42 : &openai48);',
     '  if (strcmp(provider, "zcode") == 0) return size == 24 ? &zcode24 : (size == 42 ? &zcode42 : &zcode48);',
-    '  return nullptr;', '}', '}');
+    '  return nullptr;', '}');
+  cpp.push('const lv_image_dsc_t* companion_pose(bool orbit, const lv_image_dsc_t* novaPose) {', '  if (!orbit) return novaPose;');
+  for (const name of names) cpp.push(`  if (novaPose == &${name}) return &orbit_${name};`);
+  cpp.push('  return &orbit_work;', '}', '}');
   cpp.splice(2, 0, '#include <cstring>');
   fs.writeFileSync(path.join(destination, 'nova_assets.h'), header.join('\n') + '\n');
   fs.writeFileSync(path.join(destination, 'nova_assets.cpp'), cpp.join('\n') + '\n');
-  console.log('Generated 6 robot frames and 6 original-logo images.');
+  console.log('Generated 12 transparent robot frames, 2 thumbnails and 6 original-logo images.');
 })().catch(error => { console.error(error.message); process.exit(1); });

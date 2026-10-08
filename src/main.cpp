@@ -15,6 +15,7 @@
 #include "ui_usage_details.h"
 #include "ui_notifications.h"
 #include "ui_nova.h"
+#include "ui/theme.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -32,6 +33,7 @@ static TaskHandle_t uiHandle = nullptr;
 // UI task (core 1): owns every lv_* call. Renders the dashboard from the
 // synchronized snapshot the aiMon task publishes.
 static void uiTask(void*) {
+  ui_theme::load(app_settings::appearance().theme);
   dashboard_init();
   ui_settings_init();
   ui_details_init();

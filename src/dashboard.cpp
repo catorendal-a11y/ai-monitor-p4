@@ -29,29 +29,29 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // V2 PALETTE (from the SVG)
 // ───────────────────────────────────────────────────────────────────────────────
-static const uint32_t C_BG = ui_theme::background;
-static const uint32_t C_HEADER = ui_theme::header;
-static const uint32_t C_LINE = ui_theme::border;
-static const uint32_t C_LINE_SOFT = 0x222D32;
-static const uint32_t C_EYEBROW = 0x7E8E97;
-static const uint32_t C_TITLE = 0xF3F6F7;
-static const uint32_t C_META = ui_theme::muted;
-static const uint32_t C_META_BRIGHT = 0x9CAAB1;
-static const uint32_t C_CARD = ui_theme::surface;
-static const uint32_t C_NAME = 0xEFF5F3;
-static const uint32_t C_ROWLABEL = 0xDEE5E8;
-static const uint32_t C_PCT = 0xF4F7F8;
-static const uint32_t C_UNIT = ui_theme::muted;
-static const uint32_t C_RESET = ui_theme::muted;
-static const uint32_t C_BAR_TRACK = 0x202B30;
-static const uint32_t C_SET_BG = 0x182227;
-static const uint32_t C_SET_BORDER = 0x2A373D;
-static const uint32_t C_GEAR = 0xA9B4BA;
-static const uint32_t C_SET_TXT = 0xC5CED2;
-static const uint32_t C_FOOTER_BG = 0x10181C;
-static const uint32_t C_FOOTER_STRONG = 0xCFD7DB;
-static const uint32_t C_FOOTER = 0x8A98A0;
-static const uint32_t C_GREEN = ui_theme::accent;
+static const uint32_t& C_BG = ui_theme::background;
+static const uint32_t& C_HEADER = ui_theme::header;
+static const uint32_t& C_LINE = ui_theme::border;
+static const uint32_t& C_LINE_SOFT = ui_theme::border;
+static const uint32_t& C_EYEBROW = ui_theme::muted;
+static const uint32_t& C_TITLE = ui_theme::text;
+static const uint32_t& C_META = ui_theme::muted;
+static const uint32_t& C_META_BRIGHT = ui_theme::muted;
+static const uint32_t& C_CARD = ui_theme::surface;
+static const uint32_t& C_NAME = ui_theme::text;
+static const uint32_t& C_ROWLABEL = ui_theme::text;
+static const uint32_t& C_PCT = ui_theme::text;
+static const uint32_t& C_UNIT = ui_theme::muted;
+static const uint32_t& C_RESET = ui_theme::muted;
+static const uint32_t& C_BAR_TRACK = ui_theme::border;
+static const uint32_t& C_SET_BG = ui_theme::button;
+static const uint32_t& C_SET_BORDER = ui_theme::border;
+static const uint32_t& C_GEAR = ui_theme::muted;
+static const uint32_t& C_SET_TXT = ui_theme::text;
+static const uint32_t& C_FOOTER_BG = ui_theme::header;
+static const uint32_t& C_FOOTER_STRONG = ui_theme::text;
+static const uint32_t& C_FOOTER = ui_theme::muted;
+static const uint32_t& C_GREEN = ui_theme::accent;
 static const uint32_t C_RED = 0xFF5252;
 static const uint32_t C_AMBER = 0xFFAA00;
 
@@ -450,6 +450,7 @@ static void refresh_cb(lv_event_t*) {
 
 void dashboard_init() {
   lv_obj_t* scr = lv_screen_active();
+  ui_theme::watch(scr);
   dashboardScreen = scr;
   lv_obj_set_style_bg_color(scr, lv_color_hex(C_BG), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -780,6 +781,9 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
 
 void dashboard_update() {
   if (!dashboard_is_active()) return;  // settings screen visible
+  const char* name = app_settings::companion_name(app_settings::appearance().companion);
+  auto* caption = lv_obj_get_child(novaButton, 0);
+  if (strcmp(lv_label_get_text(caption), name) != 0) lv_label_set_text(caption, name);
   const aim::Snapshot snap = aim::read();
   const uint32_t now = millis();
   const bool busy = refresh_busy(snap.refreshState);

@@ -12,7 +12,8 @@
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/aim_control.py`: local setup, scoped host controls and verified firmware installation.
 - `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
-- `assets/nova/`: original SVGs and logo attribution.
+- `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.
+- `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.
 
 ## Commands

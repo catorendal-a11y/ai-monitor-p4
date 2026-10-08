@@ -36,4 +36,4 @@ The OpenAI mark originates from the [OpenAI brand archive](https://cdn.openai.co
 
 OpenAI and ZCode names/logos remain their owners' property. The root MIT license does not grant trademark rights or relicense these marks. They identify displayed providers; no sponsorship or endorsement is implied. Check applicable source and brand terms before reusing or redistributing marks in another product.
 
-Original NOVA artwork is project-owned and covered by MIT. Generated C++ arrays retain this distinction: robot artwork is MIT; embedded provider marks retain their owners' rights.
+Original NOVA and ORBIT artwork is project-owned and covered by MIT. Generated C++ arrays retain this distinction: robot artwork is MIT; embedded provider marks retain their owners' rights.

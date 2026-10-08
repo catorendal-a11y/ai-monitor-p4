@@ -2,7 +2,7 @@
 // AI Monitor P4 - Hardware Configuration
 // GUITION JC4880P433 ESP32-P4 4.3" Touch Display Dev Board
 
-#define FW_VERSION "v1.11.0"
+#define FW_VERSION "v1.12.0"
 // Reported to the AI Monitor companion in the info handshake (protocol level).
 #define AIM_REPORTED_VERSION "2.23.0"
 

@@ -24,6 +24,21 @@ enum class SaveStatus : uint8_t { idle, saved, failed };
 void report_save(bool success);
 SaveStatus save_status();
 uint32_t save_revision();
+enum class Companion : uint8_t { nova, orbit };
+enum class Theme : uint8_t { forest, ocean, amethyst, ember };
+struct Appearance { Companion companion = Companion::nova; Theme theme = Theme::forest; };
+inline Appearance normalize_appearance(Appearance value) {
+  if (static_cast<uint8_t>(value.companion) > 1) value.companion = Companion::nova;
+  if (static_cast<uint8_t>(value.theme) > 3) value.theme = Theme::forest;
+  return value;
+}
+Appearance appearance();
+void set_appearance(Appearance value);
+inline const char* companion_name(Companion value) { return value == Companion::orbit ? "ORBIT" : "NOVA"; }
+inline const char* theme_name(Theme value) {
+  static const char* names[] = {"Forest", "Ocean", "Amethyst", "Ember"};
+  return names[static_cast<uint8_t>(normalize_appearance({Companion::nova, value}).theme)];
+}
 uint8_t warning_override_for(const char* provider, const char* title, uint32_t windowMinutes);
 uint8_t warning_for(const char* provider, const char* title, uint32_t windowMinutes);
 // Zero removes the override and restores the global default.

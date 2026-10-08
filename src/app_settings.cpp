@@ -18,6 +18,7 @@ static uint8_t s_warningPercent = 25;
 static NightSettings s_night;
 static uint8_t s_savedDim = 5, s_savedWarning = 25;
 static NightSettings s_savedNight;
+static Appearance s_appearance, s_savedAppearance;
 struct WarningRule {
   char provider[16] = {}, title[36] = {};
   uint32_t window = 0;
@@ -40,6 +41,9 @@ static void ensure_loaded() {
   if (prefs.begin(NVS_NAMESPACE, true)) {
     s_dimMinutes = normalize_dim_minutes(prefs.getUChar(KEY_DIM_MIN, 5));
     s_warningPercent = normalize_warning_percent(prefs.getUChar("warn_pct", 25));
+    uint8_t look[2] = {};
+    if (prefs.getBytesLength("appear_v1") == sizeof(look) && prefs.getBytes("appear_v1", look, sizeof(look)) == sizeof(look))
+      s_appearance = normalize_appearance({static_cast<Companion>(look[0]), static_cast<Theme>(look[1])});
     s_night = normalize_night({prefs.getBool("night_on", false), prefs.getUShort("night_start", 1320),
                               prefs.getUShort("night_end", 420), prefs.getUChar("night_pct", 20)});
     uint8_t bytes[6] = {};
@@ -57,12 +61,24 @@ static void ensure_loaded() {
   }
   s_loaded = true;
   s_savedDim = s_dimMinutes; s_savedWarning = s_warningPercent; s_savedNight = s_night;
+  s_savedAppearance = s_appearance;
   memcpy(s_savedRules, s_rules, sizeof(s_rules));
 }
 
 uint8_t dim_minutes() {
   ensure_loaded();
   return s_dimMinutes;
+}
+
+Appearance appearance() { ensure_loaded(); return s_appearance; }
+void set_appearance(Appearance value) {
+  ensure_loaded(); value = normalize_appearance(value); s_appearance = value;
+  if (value.companion == s_savedAppearance.companion && value.theme == s_savedAppearance.theme) { report_save(true); return; }
+  const uint8_t bytes[] = {static_cast<uint8_t>(value.companion), static_cast<uint8_t>(value.theme)};
+  Preferences prefs; bool saved = false;
+  if (prefs.begin(NVS_NAMESPACE, false)) { saved = prefs.putBytes("appear_v1", bytes, sizeof(bytes)) == sizeof(bytes); prefs.end(); }
+  if (saved) s_savedAppearance = value;
+  report_save(saved);
 }
 
 void set_dim_minutes(uint8_t minutes) {

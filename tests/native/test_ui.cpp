@@ -21,6 +21,7 @@ static unsigned failures = 0;
 static unsigned requestedRefreshes = 0;
 static uint8_t warningPercent = 25;
 static app_settings::NightSettings nightSettings;
+static app_settings::Appearance testAppearance;
 static app_settings::SaveStatus testSaveStatus = app_settings::SaveStatus::idle;
 static uint32_t testSaveRevision = 0;
 static std::map<std::string, uint8_t> testWarningRules;
@@ -50,6 +51,8 @@ void set_warning_for(const char* provider, const char* title, uint32_t window, u
 }
 NightSettings night() { return nightSettings; }
 void set_night(NightSettings value) { nightSettings = value; report_save(true); }
+Appearance appearance() { return testAppearance; }
+void set_appearance(Appearance value) { testAppearance = normalize_appearance(value); report_save(true); }
 }
 void display_set_brightness(uint8_t value) { actualBrightness = value; }
 uint8_t display_get_brightness() { return selectedBrightness; }
@@ -663,6 +666,45 @@ int main(int argc, char** argv) {
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "LOCAL");
   CHECK(lv_obj_is_hidden(nova_ui::providers[0].bar));
   screenshot(screenshots, "nova-claude-gemini");
+  set_sample(2, 2); sample.manualRefreshSupported = true;
+  sample.tokenUsageKnown = sample.tokenUsageSeen = true; sample.tokenSourceMask = 3;
+  sample.tokenActivityMs = fakeTick; sample.lastTokenDelta = 14500; sample.tokenIdleSeconds = 0;
+  ui_nova_show();
+  const auto brandColor = lv_obj_get_style_bg_color(nova_ui::providers[0].bar, LV_PART_INDICATOR);
+  ui_settings_show(); open_appearance(nullptr);
+  lv_obj_send_event(companionButtons[1], LV_EVENT_CLICKED, nullptr);
+  lv_obj_send_event(themeButtons[1], LV_EVENT_CLICKED, nullptr);
+  CHECK(app_settings::appearance().companion == app_settings::Companion::orbit);
+  CHECK(ui_theme::background == 0x0A1622 && ui_theme::accent == 0x54C4F2);
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(settingsScreen, LV_PART_MAIN), lv_color_hex(ui_theme::background)));
+  CHECK(lv_color_eq(lv_obj_get_style_border_color(themeButtons[0],LV_PART_MAIN),lv_color_hex(ui_theme::palettes[0].accent)));
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(nova_ui::providers[0].bar, LV_PART_INDICATOR),brandColor));
+  ui_settings_update();
+  CHECK(std::string(lv_label_get_text(saveFeedback)) == "SAVED");
+  screenshot(screenshots, "settings-appearance-ocean");
+  close_appearance(nullptr); ui_settings_hide(); ui_nova_update();
+  CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
+  CHECK(nova_ui::drawnPose == &nova_assets::orbit_work || nova_ui::drawnPose == &nova_assets::orbit_blink);
+  screenshot(screenshots, "orbit-ocean");
+  CHECK((framebuffer[120 * 800 + 50] & 0xffffffu) == ui_theme::surface);
+  nova_ui::show_dashboard(nullptr); dashboard_update();
+  CHECK(std::string(lv_label_get_text(lv_obj_get_child(novaButton,0))) == "ORBIT");
+  screenshot(screenshots, "dashboard-ocean");
+  ui_details_show(0); ui_details_update(); screenshot(screenshots, "details-ocean");
+  ui_settings_show(); open_appearance(nullptr);
+  for (size_t i = 0; i < 4; ++i) {
+    lv_obj_send_event(themeButtons[i], LV_EVENT_CLICKED, nullptr);
+    CHECK(lv_color_eq(lv_obj_get_style_bg_color(nova_ui::screen,LV_PART_MAIN),lv_color_hex(ui_theme::palettes[i].background)));
+  }
+  lv_obj_send_event(themeButtons[2], LV_EVENT_CLICKED, nullptr);
+  close_appearance(nullptr); ui_settings_hide(); ui_nova_show();
+  screenshot(screenshots, "orbit-amethyst");
+  ui_settings_show(); open_appearance(nullptr);
+  lv_obj_send_event(companionButtons[0], LV_EVENT_CLICKED, nullptr);
+  lv_obj_send_event(themeButtons[3], LV_EVENT_CLICKED, nullptr);
+  close_appearance(nullptr); ui_settings_hide(); ui_nova_show();
+  CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "NOVA");
+  screenshot(screenshots, "nova-ember");
   idle_dim_touch(true); idle_dim_touch(false); nightSettings.enabled = false;
   set_sample(8, 3); sample.manualRefreshSupported = true;
   ui_nova_update(); CHECK(nova_ui::pageCount == 4);

@@ -17,6 +17,7 @@ namespace nova_ui {
 static lv_obj_t *screen = nullptr, *dashboard = nullptr, *stage = nullptr, *figure = nullptr;
 static lv_obj_t *title = nullptr, *subtitle = nullptr, *hint = nullptr, *clock = nullptr, *link = nullptr;
 static lv_obj_t* tracking = nullptr;
+static lv_obj_t* companionLabel = nullptr;
 static lv_obj_t *updateButton = nullptr, *updateLabel = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 struct ProviderCard {
   lv_obj_t *card = nullptr, *icon = nullptr, *logoBox = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
@@ -72,6 +73,7 @@ namespace nova_ui {
 void init() {
   dashboard = lv_screen_active();
   screen = lv_obj_create(nullptr);
+  ui_theme::watch(screen);
   lv_obj_set_style_bg_color(screen, lv_color_hex(ui_theme::background), 0);
   lv_obj_set_style_pad_all(screen, 0, 0); lv_obj_set_style_border_width(screen, 0, 0);
   lv_obj_set_scrollable(screen, false);
@@ -80,7 +82,7 @@ void init() {
   lv_obj_set_style_border_width(header, 0, 0); lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_style_radius(header, 0, 0); lv_obj_set_scrollable(header, false);
   label(header, 24, 12, 400, "AI MONITOR / COMPANION", &lv_font_montserrat_12, ui_theme::muted);
-  label(header, 24, 34, 360, "NOVA", &lv_font_montserrat_26);
+  companionLabel = label(header, 24, 34, 360, "NOVA", &lv_font_montserrat_26);
   clock = label(header, 574, 28, 92, "--:--", &lv_font_montserrat_26);
   button(header, 688, 14, 88, "SET", show_settings);
   stage = lv_obj_create(screen); lv_obj_set_pos(stage, 20, 90); lv_obj_set_size(stage, 430, 315);
@@ -133,6 +135,8 @@ void show() { lv_screen_load(screen); ui_nova_update(); }
 void update() {
   if (!is_active()) return;
   const auto snapshot = aim::read(); const uint32_t now = millis();
+  const auto companion = app_settings::appearance().companion;
+  text(companionLabel, app_settings::companion_name(companion));
   const bool resting = strcmp(idle_dim_mode(), "NIGHT") == 0 || strcmp(idle_dim_mode(), "IDLE") == 0;
   mood = state.evaluate(snapshot, now, resting, [](const char* provider, const aim::Row& row) {
     return app_settings::warning_for(provider, row.title, row.windowMinutes);
@@ -158,6 +162,7 @@ void update() {
     case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
   }
   if ((mood == NovaMood::ready || mood == NovaMood::working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
+  pose = nova_assets::companion_pose(companion == app_settings::Companion::orbit, pose);
   if (pose != drawnPose) { drawnPose = pose; lv_image_set_src(figure, pose); }
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
   if (now - previousMotion >= 160u) {

@@ -6,7 +6,7 @@ The portable Windows archive lets users run the companion and flash the display 
 
 1. Push the reviewed, credential-free repository to your GitHub repository. Do not copy local configurations, logs or unrelated output files.
 2. Ensure Actions is enabled. Set `FW_VERSION` to the intended version and pass CI. Commit before tagging.
-3. Create and push a tag matching `FW_VERSION`, such as `v1.11.0`. This explicitly starts the Portable Windows release workflow.
+3. Create and push a tag matching `FW_VERSION`, such as `v1.12.0`. This explicitly starts the Portable Windows release workflow.
 4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables and creates a **draft release** containing the Windows ZIP and its SHA-256 checksum. Drafts are invisible to ordinary downloaders.
 5. Download the draft ZIP, extract it on Windows, test the menu, setup and firmware on the target board, and verify no private files are included. Review license notices and the corresponding upstream source.
 6. Publish the reviewed draft using GitHub's Releases UI. README's recommended download is available after publication.

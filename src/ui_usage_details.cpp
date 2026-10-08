@@ -125,6 +125,7 @@ lv_obj_t* detail_button(lv_obj_t* parent, int x, int y, int width, const char* t
 void ui_details_init() {
   dashboard = lv_screen_active();
   screen = lv_obj_create(nullptr);
+  ui_theme::watch(screen);
   lv_obj_set_style_bg_color(screen, lv_color_hex(ui_theme::background), 0);
   lv_obj_set_style_pad_all(screen, 0, 0); lv_obj_set_style_border_width(screen, 0, 0);
   lv_obj_set_scrollable(screen, false);
@@ -145,7 +146,7 @@ void ui_details_init() {
     row.percent = detail_label(row.card, 608, 1, 124, "", &lv_font_montserrat_32, ui_theme::text);
     lv_obj_set_style_text_align(row.percent, LV_TEXT_ALIGN_RIGHT, 0);
     row.bar = lv_bar_create(row.card); lv_obj_set_pos(row.bar, 16, 45); lv_obj_set_size(row.bar, 716, 8);
-    lv_bar_set_range(row.bar, 0, 100); lv_obj_set_style_bg_color(row.bar, lv_color_hex(0x202B30), LV_PART_MAIN);
+    lv_bar_set_range(row.bar, 0, 100); lv_obj_set_style_bg_color(row.bar, lv_color_hex(ui_theme::border), LV_PART_MAIN);
     lv_obj_set_style_pad_all(row.bar, 0, 0); lv_obj_set_style_radius(row.bar, 4, LV_PART_MAIN);
     row.reset = detail_label(row.card, 16, 66, 716, "", &lv_font_montserrat_16, ui_theme::muted);
   }

@@ -2,7 +2,7 @@
 
 NOVA is a touchscreen desk companion that shows AI usage limits and reacts to registered token activity from the AI providers you select.
 
-**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.11.0. UI, setup and documentation are in English.
+**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.12.0. UI, setup and documentation are in English.
 
 ![NOVA interface](docs/nova-preview.png)
 
@@ -10,11 +10,11 @@ Preview rendered from the real UI with synthetic test data.
 
 ## Start here
 
-**Windows 10/11 x64:** download **ai-monitor-p4-v1.11.0-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
+**Windows 10/11 x64:** download **ai-monitor-p4-v1.12.0-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
 
 1. Connect the screen with a USB data cable.
 2. Choose **1 - First-time setup**, explicitly select your AI providers, then select the USB port.
-3. On a new board, choose **4 - Install / update firmware**, then **1 - First installation**. Confirm the correct board/port. Skip this only on firmware v1.11.0+. Use the application update on older AI Monitor firmware.
+3. On a new board, choose **4 - Install / update firmware**, then **1 - First installation**. Confirm the correct board/port. Skip this only on firmware v1.12.0+. Use the application update on older AI Monitor firmware.
 4. Choose **2 - Start host** and close the menu. The companion keeps running invisibly.
 
 [Step-by-step guide and troubleshooting](docs/QUICK_START.md)
@@ -49,6 +49,10 @@ No keys are included in the public package. Configurations, logs and databases s
 | 5. Status | Shows local login availability, USB ports and readable token sources without making API calls. |
 | 6. View recent log | Shows recent connection and polling messages. |
 | 7. Provider integration help | Shows selected-provider requirements and optionally installs the Claude quota bridge. |
+
+## Choose your robot and UI colors
+
+Open **SET > APPEARANCE** on the display. Choose **NOVA** or the new hovering **ORBIT** companion, then select **Forest**, **Ocean**, **Amethyst** or **Ember**. The robot and theme apply immediately and are saved together on the display. Both robots use the same live activity states. Themes update all screens; provider logos/colors and low/critical warning colors retain their meanings.
 
 ## On the screen
 

@@ -10,6 +10,7 @@
 #include "ui/idle_dim.h"
 #include "ui/theme.h"
 #include "ai_monitor/ai_monitor.h"
+#include "ui/nova_assets.h"
 
 static lv_obj_t* settingsScreen = nullptr;
 static lv_obj_t* dashScreen = nullptr;
@@ -30,6 +31,8 @@ static lv_obj_t *alertsButton = nullptr, *alertsOverlay = nullptr, *warningSlide
 static lv_obj_t *nightButton = nullptr, *nightOverlay = nullptr, *nightToggleLabel = nullptr, *nightValue = nullptr;
 static lv_obj_t *nightTimeValues[4] = {}, *nightTimeButtons[8] = {}, *nightSlider = nullptr;
 static app_settings::NightSettings nightDraft;
+static lv_obj_t *appearanceOverlay = nullptr, *companionPreview = nullptr;
+static lv_obj_t *companionButtons[2] = {}, *companionCaptions[2] = {}, *themeButtons[4] = {}, *themeCaptions[4] = {};
 static const uint8_t kDimChoices[] = {0, 1, 5, 10};
 static const char* kDimNames[] = {"OFF", "1 MIN", "5 MIN", "10 MIN"};
 static const uint8_t kBrightnessPresets[] = {25, 50, 75, 100};
@@ -118,6 +121,35 @@ static lv_obj_t* make_button(lv_obj_t* parent, int x, int y, int width, const ch
   if (labelOut) *labelOut = label;
   return button;
 }
+
+static void refresh_appearance() {
+  const auto look = app_settings::appearance();
+  for (size_t i = 0; i < 2; ++i) {
+    const bool selected = static_cast<uint8_t>(look.companion) == i;
+    style_button(companionButtons[i], selected);
+    lv_obj_set_style_text_color(companionCaptions[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
+  }
+  for (size_t i = 0; i < 4; ++i) {
+    style_button(themeButtons[i], static_cast<uint8_t>(look.theme) == i);
+    lv_obj_set_style_bg_color(themeButtons[i], lv_color_hex(ui_theme::palettes[i].button), 0);
+    lv_obj_set_style_border_color(themeButtons[i], lv_color_hex(ui_theme::palettes[i].accent), 0);
+    lv_obj_set_style_text_color(themeCaptions[i], lv_color_hex(ui_theme::palettes[i].text), 0);
+  }
+  lv_image_set_src(companionPreview, look.companion == app_settings::Companion::orbit ? &nova_assets::orbit_thumb : &nova_assets::nova_thumb);
+}
+static void companion_select(lv_event_t* event) {
+  auto look = app_settings::appearance();
+  look.companion = static_cast<app_settings::Companion>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
+  app_settings::set_appearance(look); refresh_appearance();
+}
+static void theme_select(lv_event_t* event) {
+  auto look = app_settings::appearance();
+  look.theme = static_cast<app_settings::Theme>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
+  app_settings::set_appearance(look); ui_theme::apply(look.theme); refresh_appearance();
+  lastDimChoice = lastPresetValue = 255; refresh_choices();
+}
+static void open_appearance(lv_event_t*) { refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
+static void close_appearance(lv_event_t*) { lv_obj_set_hidden(appearanceOverlay, true); }
 
 static void refresh_warning_target();
 static void warning_slider_cb(lv_event_t* event) {
@@ -267,7 +299,7 @@ void ui_settings_init() {
   lv_obj_set_size(brightnessSlider, 700, 20);
   lv_slider_set_range(brightnessSlider, 5, 100);
   lv_obj_set_ext_click_area(brightnessSlider, 16);
-  lv_obj_set_style_bg_color(brightnessSlider, lv_color_hex(0x202B30), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(brightnessSlider, lv_color_hex(ui_theme::border), LV_PART_MAIN);
   lv_obj_set_style_bg_opa(brightnessSlider, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_radius(brightnessSlider, 5, LV_PART_MAIN);
   lv_obj_set_style_bg_color(brightnessSlider, lv_color_hex(ui_theme::accent), LV_PART_INDICATOR);
@@ -293,7 +325,8 @@ void ui_settings_init() {
              &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(settingsScreen, 24, 424, 152, "<  BACK", back_cb, nullptr);
   nightButton = make_button(settingsScreen, 200, 424, 176, "NIGHT MODE", open_night, nullptr);
-  make_label(settingsScreen, 540, 440, 236, "AI Monitor P4 " FW_VERSION, &lv_font_montserrat_14,
+  make_button(settingsScreen, 392, 424, 176, "APPEARANCE", open_appearance, nullptr);
+  make_label(settingsScreen, 592, 440, 184, "AI Monitor P4 " FW_VERSION, &lv_font_montserrat_14,
              ui_theme::muted, LV_TEXT_ALIGN_RIGHT);
   lastDimChoice = lastPresetValue = 255;
   refresh_brightness();
@@ -363,7 +396,29 @@ void ui_settings_init() {
   make_label(nightCard, 24, 286, 480, "HH / MM: tap or hold +/- to adjust.\nTouch restores daytime level for 60 seconds.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(nightCard, 552, 284, 176, "DONE", close_night, nullptr);
   lv_obj_set_hidden(nightOverlay, true);
-  saveFeedback = make_label(lv_layer_top(), 392, 438, 132, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  appearanceOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_set_size(appearanceOverlay, 800, 480); lv_obj_set_pos(appearanceOverlay, 0, 0);
+  lv_obj_set_style_bg_color(appearanceOverlay, lv_color_hex(ui_theme::background), 0);
+  lv_obj_set_style_bg_opa(appearanceOverlay, LV_OPA_80, 0); lv_obj_set_style_pad_all(appearanceOverlay, 0, 0);
+  lv_obj_set_style_border_width(appearanceOverlay, 0, 0); lv_obj_set_scrollable(appearanceOverlay, false);
+  auto* appearanceCard = lv_obj_create(appearanceOverlay); lv_obj_set_pos(appearanceCard, 24, 54); lv_obj_set_size(appearanceCard, 752, 374);
+  lv_obj_set_style_bg_color(appearanceCard, lv_color_hex(ui_theme::surface), 0);
+  lv_obj_set_style_border_color(appearanceCard, lv_color_hex(ui_theme::border), 0); lv_obj_set_style_pad_all(appearanceCard, 0, 0);
+  lv_obj_set_scrollable(appearanceCard, false);
+  make_label(appearanceCard, 24, 18, 700, "Make it yours", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  make_label(appearanceCard, 24, 58, 400, "COMPANION", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  for (size_t i = 0; i < 2; ++i) companionButtons[i] = make_button(appearanceCard, 24 + i * 180, 86, 166,
+      app_settings::companion_name(static_cast<app_settings::Companion>(i)), companion_select, reinterpret_cast<void*>(i), &companionCaptions[i]);
+  companionPreview = lv_image_create(appearanceCard); lv_obj_set_pos(companionPreview, 546, 54); lv_obj_set_clickable(companionPreview, false);
+  make_label(appearanceCard, 24, 160, 700, "UI COLOR THEME", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  for (size_t i = 0; i < 4; ++i) themeButtons[i] = make_button(appearanceCard, 24 + i * 178, 192, 166,
+      app_settings::theme_name(static_cast<app_settings::Theme>(i)), theme_select, reinterpret_cast<void*>(i), &themeCaptions[i]);
+  make_label(appearanceCard, 24, 260, 700, "Changes apply now and are saved on this display.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(appearanceCard, 24, 286, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_button(appearanceCard, 552, 312, 176, "DONE", close_appearance, nullptr);
+  lv_obj_set_hidden(appearanceOverlay, true);
+  ui_theme::watch(settingsScreen); refresh_appearance();
+  saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
   lv_obj_set_hidden(saveFeedback, true);
 }
 
@@ -382,6 +437,10 @@ static void refresh_brightness() {
 }
 
 void ui_settings_update() {
+  const bool choosing = !lv_obj_is_hidden(appearanceOverlay);
+  if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
+  const int x = choosing ? 48 : 590, y = choosing ? 446 : 406;
+  if (lv_obj_get_x(saveFeedback) != x || lv_obj_get_y(saveFeedback) != y) lv_obj_set_pos(saveFeedback, x, y);
   if (lv_screen_active() == settingsScreen && !lv_obj_has_state(brightnessSlider, LV_STATE_PRESSED)) refresh_brightness();
   if (shownSaveRevision != app_settings::save_revision()) {
     shownSaveRevision = app_settings::save_revision(); savedAtMs = millis();
@@ -400,6 +459,7 @@ void ui_settings_show() {
 void ui_settings_hide() {
   lv_obj_set_hidden(saveFeedback, true);
   lv_obj_set_hidden(alertsOverlay, true); lv_obj_set_hidden(nightOverlay, true);
+  lv_obj_set_hidden(appearanceOverlay, true);
   lv_screen_load(settingsReturnScreen ? settingsReturnScreen : dashScreen);
 }
 bool ui_settings_is_active() { return lv_screen_active() == settingsScreen; }
