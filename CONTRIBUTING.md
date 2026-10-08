@@ -4,7 +4,7 @@ Use English for project code comments, UI, documentation, issues and pull reques
 
 ## Development
 
-1. Run `setup.ps1` on Windows or `sh setup.sh` elsewhere.
+1. Run `setup.ps1 -BuildTools` on Windows. Elsewhere run `sh setup.sh`, then install PlatformIO in the local .venv with `python -m pip install 'platformio>=6.1,<7'`.
 2. Build with `python -m platformio run -e esp32p4-release` using this checkout's .venv.
 3. Run `python -m unittest discover -s tests -p "test_*.py"`.
 4. Run `python scripts/run_tests.py`; for UI changes also use `--ui` with GCC, CMake and Ninja installed.

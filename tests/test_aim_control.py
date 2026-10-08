@@ -1,0 +1,115 @@
+import contextlib
+import hashlib
+import io
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import Mock, patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import aim_control as control
+
+
+class SetupTests(unittest.TestCase):
+    def test_frozen_host_outlives_menu_using_independent_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = Mock(); child.poll.return_value = None
+            with patch.object(control.sys, 'frozen', True, create=True), \
+                    patch.object(control.host, 'load_config'), patch.object(control, 'stop_host'), \
+                    patch.object(control.subprocess, 'Popen', return_value=child) as spawn, \
+                    patch.object(control.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
+                control.start_host(root)
+            self.assertEqual(spawn.call_args.kwargs['env']['PYINSTALLER_RESET_ENVIRONMENT'], '1')
+            self.assertEqual(spawn.call_args.args[0][-1], '--host')
+
+    def test_setup_preserves_existing_key_and_settings_without_printing_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = {'port': 'COM6', 'zai_key': 'fixture-key', 'interval_s': 60, 'custom': True}
+            control.save_config(config, root)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), patch.object(control.list_ports, 'comports', return_value=[]):
+                control.configure(root, ask=lambda _: '', read_secret=lambda _: '')
+            self.assertEqual(control.local_config(root)['zai_key'], config['zai_key'])
+            self.assertEqual(control.local_config(root)['interval_s'], 60)
+            self.assertTrue(control.local_config(root)['custom'])
+            self.assertNotIn(config['zai_key'], output.getvalue())
+            self.assertFalse(list((root / 'tools').glob('*.tmp')))
+
+    def test_invalid_key_cannot_replace_valid_local_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG), root)
+            before = (root / 'tools/aim_host.json').read_bytes()
+            with contextlib.redirect_stdout(io.StringIO()), patch.object(control.list_ports, 'comports', return_value=[]):
+                with self.assertRaises(ValueError):
+                    control.configure(root, ask=lambda _: '', read_secret=lambda _: 'invalid\nsecret')
+            self.assertEqual((root / 'tools/aim_host.json').read_bytes(), before)
+
+    def test_numbered_port_selection_is_explicit_with_multiple_boards(self):
+        ports = [Mock(device='COM6', description='Display'), Mock(device='COM4', description='Other board')]
+        with patch.object(control.list_ports, 'comports', return_value=ports), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(control.choose_port(ask=lambda _: '2'), 'COM6')
+
+    def test_malformed_config_is_preserved_and_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); (root / 'tools').mkdir()
+            path = root / 'tools/aim_host.json'; path.write_text('{broken')
+            with self.assertRaises(control.SetupError):
+                control.local_config(root)
+            self.assertEqual(path.read_text(), '{broken')
+
+    def test_host_control_ignores_other_checkouts_and_reused_python_processes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ours = Mock(pid=12345, info={'cmdline': ['python', str(root / 'tools/aim_host.py')], 'exe': sys.executable})
+            other = Mock(pid=12346, info={'cmdline': ['python', str(root / 'other/tools/aim_host.py')], 'exe': sys.executable})
+            reused = Mock(pid=12347, info={'cmdline': ['python', 'unrelated.py'], 'exe': sys.executable})
+            with patch.object(control.psutil, 'process_iter', return_value=[ours, other, reused]):
+                self.assertEqual(control.owned_hosts(root), [ours])
+
+    def test_firmware_hash_and_offsets_are_checked_before_flash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); (root / 'firmware').mkdir()
+            files = {}
+            for name in ['factory.bin', 'application.bin']:
+                content = ('synthetic-' + name).encode()
+                (root / 'firmware' / name).write_bytes(content)
+                files[name] = {'sha256': hashlib.sha256(content).hexdigest()}
+            manifest = {'board': 'GUITION JC4880P433', 'chip': 'esp32p4', 'files': files}
+            (root / 'firmware/manifest.json').write_text(json.dumps(manifest))
+            self.assertEqual(control.flash_command('install', 'COM6', root)[-2], '0x0')
+            self.assertEqual(control.flash_command('update', 'COM6', root)[-2], '0x10000')
+            (root / 'firmware/factory.bin').write_bytes(b'corrupt')
+            with self.assertRaises(control.SetupError):
+                control.flash_command('install', 'COM6', root)
+
+    def test_cancelled_flash_never_stops_host_or_invokes_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            replies = iter(['1', 'COM6', 'NO'])
+            with contextlib.redirect_stdout(io.StringIO()), patch.object(control, 'flash_command', return_value=['flasher']), \
+                    patch.object(control, 'stop_host') as stop, patch.object(control.subprocess, 'run') as run, \
+                    patch.object(control.list_ports, 'comports', return_value=[]):
+                control.flash(root, ask=lambda _: next(replies))
+            stop.assert_not_called(); run.assert_not_called()
+
+    def test_status_is_local_and_does_not_show_keys_or_make_api_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, zai_key='fixture-status-key'), root)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), patch.object(control, 'owned_hosts', return_value=[]), \
+                    patch.object(control.list_ports, 'comports', return_value=[]), \
+                    patch.object(control.host.TokenReporter, 'poll', return_value={'sources': 0}), \
+                    patch.object(control.host.urllib.request, 'urlopen') as network:
+                control.status(root)
+            network.assert_not_called()
+            self.assertNotIn('fixture-status-key', output.getvalue())
+
+
+if __name__ == '__main__':
+    unittest.main()

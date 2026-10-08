@@ -7,9 +7,9 @@ if [ ! -x "$task_venv_python" ]; then
     "$task_python" -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10 or later is required"'
     "$task_python" -m venv "$task_project_root/.venv"
 fi
-"$task_venv_python" -m pip install -r "$task_project_root/tools/requirements.txt" 'platformio>=6.1,<7'
+"$task_venv_python" -m pip install -r "$task_project_root/tools/requirements.txt"
 if [ ! -e "$task_project_root/tools/aim_host.json" ]; then
     cp "$task_project_root/tools/aim_host.example.json" "$task_project_root/tools/aim_host.json"
 fi
-printf '%s\n' 'Setup complete. Build with .venv/bin/python -m platformio run -e esp32p4-release'
+printf '%s\n' 'Setup complete. Open the menu with .venv/bin/python tools/aim_control.py'
 printf '%s\n' 'Local configuration: tools/aim_host.json (ignored by Git). No hardware was flashed.'

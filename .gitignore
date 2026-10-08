@@ -13,6 +13,10 @@ outputs/
 *.elf
 *.map
 *.ppm
+*.exe
+*.spec
+dist/
+firmware/
 
 # Host configuration and credentials stay on the local machine
 tools/aim_host.json

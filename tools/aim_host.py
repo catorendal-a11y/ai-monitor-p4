@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import serial
 from serial.tools import list_ports
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(sys.executable).resolve().parent / "tools" if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "aim_host.json"
 CODEX_AUTH = Path.home() / ".codex" / "auth.json"
 MAX_FRAME_BYTES = 4095

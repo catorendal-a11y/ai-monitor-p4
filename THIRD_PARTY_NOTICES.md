@@ -18,9 +18,13 @@ These are Espressif display/touch components. Original ownership and Apache-2.0 
 - [LVGL](https://github.com/lvgl/lvgl), v9.6.0: MIT; retain upstream copyright/license. Fonts and assets included by LVGL retain the terms supplied with LVGL; this project does not relicense fonts.
 - [ArduinoJson](https://github.com/bblanchon/ArduinoJson), 7.4.3: MIT, copyright Benoit Blanchon and contributors; retain upstream notices.
 - [pyserial](https://github.com/pyserial/pyserial), 3.5: BSD-style license supplied by upstream.
+- [psutil](https://github.com/giampaolo/psutil), 7.0.0: BSD-3-Clause; used to identify only this checkout's host processes.
+- Portable releases bundle Python under its supplied PSF license and runtime dependency notices. PyInstaller 6.16.0 supplies its bootloader under GPL with its distribution exception; retain the supplied texts.
+- The separately invoked `firmware-flasher.exe` is built from [esptool](https://github.com/espressif/esptool), 5.4.0, under GPL-2.0-or-later. Its upstream source archive and license are included with portable releases. Project-owned source remains MIT; the root MIT text does not relicense this executable or its dependencies.
 - [pioarduino](https://github.com/pioarduino/platform-espressif32), Arduino-ESP32 and ESP-IDF: obtained through PlatformIO. Component-specific licenses/notices continue to apply; consult the installed distributions before redistributing toolchains or combined artifacts.
 
 Dependencies are downloaded by build/setup, not vendored into this public source package.
+The portable Windows ZIP includes dependency license files/metadata under `licenses/` and esptool corresponding source under `third-party-source/`. Its reviewed build scripts and project source are included. Preserve these files when redistributing the complete portable package.
 
 ## Protocol reference
 

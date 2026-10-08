@@ -10,6 +10,8 @@
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/token_activity.py`: read-only numeric token activity.
+- `tools/aim_control.py`: local setup, scoped host controls and verified firmware installation.
+- `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
 - `assets/nova/`: original SVGs and logo attribution.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.
 
@@ -25,6 +27,7 @@ python scripts/run_tests.py --ui --screenshots work/ui-previews
 ```
 
 Build first to install pinned ArduinoJson/LVGL. Native tests need C++17; UI also needs C compiler, CMake and Ninja. Use `--cxx`/`--cc` for paths. Flash only when requested, after stopping the companion, using the identified upload port.
+Use `setup.ps1 -BuildTools` for development; default setup installs host dependencies only. Source and portable release archives serve different users. Never copy private configurations or recursively export a live project into a release.
 
 ## Rules
 
