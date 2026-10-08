@@ -15,7 +15,14 @@ inline const char* token_tracking_label(const aim::Snapshot& snapshot, uint32_t 
     case 1: return "TRACKING / Codex";
     case 2: return "TRACKING / ZCode";
     case 3: return "TRACKING / Codex + ZCode";
-    default: return "TRACKING / sources unknown";
+    case 4: return "TRACKING / Claude";
+    case 8: return "TRACKING / Gemini";
+    case 16: return "TRACKING / Copilot";
+    case 32: return "TRACKING / Cursor";
+    case 64: return "TRACKING / Antigravity";
+    case 128: return "TRACKING / OpenCode";
+    case 0: return "TRACKING / sources unknown";
+    default: return "TRACKING / multiple sources";
   }
 }
 

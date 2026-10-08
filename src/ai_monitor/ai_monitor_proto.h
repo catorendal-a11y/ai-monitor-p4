@@ -173,7 +173,7 @@ class ProtoCore {
   }
 
   void emitf(const char* fmt, ...) {
-    char buf[512];
+    char buf[768];
     va_list args;
     va_start(args, fmt);
     const int length = vsnprintf(buf, sizeof(buf), fmt, args);
@@ -213,7 +213,7 @@ class ProtoCore {
     emitf("{\"type\":\"info\",\"version\":\"%s\",\"firmwareVersion\":\"%s\",\"bootId\":%u,\"mac\":\"%s\","
           "\"display\":\"jc4880p433\",\"panel\":\"ST7701S\",\"panelId\":\"esp32p4-mipi-dsi\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
-          "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,"
+          "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,"
           "\"uptime\":%lu,\"heap\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
           (unsigned long)(tick() / 1000u), (unsigned)heap(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
@@ -373,7 +373,11 @@ class ProtoCore {
 
     const char* notice = data0["notice"] | (const char*)"";
     if (notice[0] != '\0') {
+      if (!data0["informational"].isNull() && !data0["informational"].is<bool>()) {
+        reply_error(frameId, schemaVersion, "invalid informational flag"); return;
+      }
       view.notice = true;
+      view.informational = data0["informational"] | false;
       copy_capped(view.message, sizeof(view.message), notice);
       store_clock(doc);
       store_view((uint8_t)viewIndex, view);
@@ -461,7 +465,7 @@ class ProtoCore {
       reply_info();
     } else if (strcmp(cmd, "token_activity") == 0) {
       if (!doc["known"].is<bool>() || !doc["seen"].is<bool>() || !doc["sources"].is<uint8_t>() ||
-          doc["sources"].as<uint8_t>() > 3 || !doc["idleSeconds"].is<uint32_t>() || !doc["delta"].is<uint64_t>()) {
+          !doc["idleSeconds"].is<uint32_t>() || !doc["delta"].is<uint64_t>()) {
         reply_error(-1, 0, "invalid token activity"); return;
       }
       snap_.tokenUsageKnown = doc["known"].as<bool>(); snap_.tokenUsageSeen = doc["seen"].as<bool>();

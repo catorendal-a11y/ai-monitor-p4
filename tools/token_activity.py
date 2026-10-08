@@ -4,13 +4,19 @@ from contextlib import closing
 from collections import OrderedDict
 import time
 from pathlib import Path
+from local_activity import LocalActivity
+from provider_catalog import PROVIDERS
 
 
 class TokenReporter:
     MAX_TRACKED = 8192  # Keep recent IDs across temporarily missing/evicted query rows.
-    def __init__(self, home=None, clock=None):
+    def __init__(self, home=None, clock=None, providers=None, activity_dir=None):
         home = Path.home() if home is None else Path(home)
         self.paths = {"codex": home / ".codex/state_5.sqlite", "zcode": home / ".zcode/cli/db/db.sqlite"}
+        self.paths.update(claude=home / '.claude/projects', gemini=home / '.gemini/tmp')
+        self.providers = ['codex', 'zcode'] if providers is None else list(providers)
+        self.activity_dir = Path(activity_dir) if activity_dir is not None else None
+        self.local = LocalActivity()
         self.clock = time.monotonic if clock is None else clock
         self.started = None
         self.previous = {}
@@ -39,8 +45,19 @@ class TokenReporter:
             return None
         self.last_poll = now
         delta, sources = 0, 0
-        for provider, bit in [("codex", 1), ("zcode", 2)]:
-            counts = self.read_counts(provider, self.paths[provider])
+        for provider in self.providers:
+            bit = PROVIDERS[provider][1]
+            if provider in ('codex', 'zcode'):
+                counts = self.read_counts(provider, self.paths[provider])
+            elif provider in ('claude', 'gemini'):
+                counts = self.local.read(provider, self.paths[provider])
+            else:
+                counts = None
+            if self.activity_dir is not None:
+                from telemetry_bridge import read_counters
+                bridge = read_counters(self.activity_dir, provider)
+                if bridge is not None:
+                    counts = dict(counts or {}, **bridge)
             if counts is None:
                 continue
             sources |= bit

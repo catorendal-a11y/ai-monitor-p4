@@ -20,6 +20,7 @@ firmware/
 
 # Host configuration and credentials stay on the local machine
 tools/aim_host.json
+tools/activity/
 .env
 .env.*
 !.env.example

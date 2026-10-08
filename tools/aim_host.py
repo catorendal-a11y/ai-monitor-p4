@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter
+from provider_catalog import selected_providers, PROVIDERS
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
 import serial
@@ -105,6 +106,7 @@ def LOG(msg):
         pass
 
 DEFAULT_CONFIG = {
+    "providers": [],      # First-time setup requires an explicit selection.
     "port": "auto",       # "auto" = detect Espressif USB CDC, or e.g. "COM6"
     # 240 s: usage endpoints are free status endpoints (no model quota
     # consumed), but polling stays polite; the panel's LIVE badge tolerates
@@ -168,6 +170,7 @@ def load_config():
         raise ValueError("aim_host.json must contain a JSON object")
     out = dict(DEFAULT_CONFIG)
     out.update(cfg)
+    out["providers"] = selected_providers(cfg, legacy=CONFIG_PATH.exists())
     if not isinstance(out["port"], str) or not out["port"].strip():
         raise ValueError("port must be 'auto' or a serial port name")
     out["port"] = out["port"].strip()
@@ -427,6 +430,7 @@ class Panel:
         self.cycle_deadline = None
         self.activity_supported = False
         self.tokens_supported = False
+        self.provider_selection_supported = False
         self.token_reporter = None
 
     def close(self):
@@ -477,6 +481,7 @@ class Panel:
         info = self.wait_for("info")
         self.activity_supported = info.get("hostActivity") is True
         self.tokens_supported = info.get("tokenActivity") is True
+        self.provider_selection_supported = info.get('providerSelection') is True
         boot_id, uptime = info.get("bootId"), info.get("uptime")
         if self.boot_id is not None and boot_id != self.boot_id:
             raise ConnectionResetError("Panel restarted; restoring views")
@@ -540,6 +545,8 @@ def connect_panel(port_name, views):
     try:
         time.sleep(0.5)
         panel.heartbeat()
+        if any(provider not in ('codex', 'zcode') for provider in views) and not panel.provider_selection_supported:
+            raise RuntimeError('Update display firmware to v1.11.0+ for additional AI providers.')
         panel.send_line(json.dumps({"cmd": "set_views", "views": views, "mode": "manual",
                                     "interval": 10, "active": 0}))
         panel.wait_for("ok", command="set_views")
@@ -673,7 +680,9 @@ def run(cfg):
     interval = cfg["interval_s"]
     zai_key = cfg.get("zai_key", "")
     zai_provider = cfg.get("zai_provider", "zcode")
-    views = ["codex"] + ([zai_provider] if zai_key else [])
+    views = selected_providers(cfg)
+    if not views:
+        raise ValueError('No providers selected. Open First-time setup.')
 
     try:
         _run_loop(cfg, interval, zai_key, views)
@@ -687,7 +696,7 @@ def _run_loop(cfg, interval, zai_key, views):
     retries = ProviderRetries(interval)
     fetcher = FetchPool()
     watcher = ConfigWatcher()
-    tokens = TokenReporter()
+    tokens = TokenReporter(providers=views, activity_dir=HERE / 'activity')
     try:
         while True:
             watcher.check()
@@ -697,7 +706,12 @@ def _run_loop(cfg, interval, zai_key, views):
                 cfg = changed_config
                 interval = cfg["interval_s"]
                 zai_key = cfg.get("zai_key", "")
-                changed_views = ["codex"] + ([cfg["zai_provider"]] if zai_key else [])
+                changed_views = selected_providers(cfg)
+                if not changed_views:
+                    LOG('No providers selected; stopping host. Open First-time setup.')
+                    return
+                if changed_views != views:
+                    tokens = TokenReporter(providers=changed_views, activity_dir=HERE / 'activity')
                 retries.interval = interval
                 if previous.get("zai_key") != zai_key:
                     retries.succeeded("zcode")
@@ -765,6 +779,7 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
     if not isinstance(getattr(panel, "retries", None), ProviderRetries):
         panel.retries = ProviderRetries(cfg["interval_s"])
     for idx, provider in enumerate(views):
+        informational = False
         deferred = panel.retries.remaining(provider) > 0
         fetcher = getattr(panel, "fetcher", None)
         if deferred:
@@ -774,9 +789,20 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         elif provider == cfg["zai_provider"] and zai_key:
             callback = lambda: fetch_zcode(zai_key)
             rows, notice = fetcher.fetch(provider, callback, panel) if isinstance(fetcher, FetchPool) else callback()
+        elif provider not in ('codex', 'zcode'):
+            from telemetry_bridge import read_claude_quota, read_counters
+            reported = read_claude_quota(HERE / 'activity') if provider == 'claude' else None
+            rows = [dict(title=row['title'], usedPercent=percent_value(row['usedPercent']),
+                         resetsAt=now_iso_epoch(row['reset_epoch']), windowMinutes=row['windowMinutes']) for row in reported] if reported else None
+            notice = None if rows else ('Local token activity; quota bridge optional' if provider == 'claude' else
+                                       'Local token activity; quota unavailable' if provider == 'gemini' else
+                                       'Numeric telemetry bridge required; see provider guide')
+            if not rows and provider not in ('claude', 'gemini') and read_counters(HERE / 'activity', provider) is not None:
+                notice = 'External token activity; quota unavailable'
+            informational = not rows
         else:
             rows, notice = None, f"{provider} not configured"
-        if not rows:
+        if not rows and not informational:
             panel.last_poll_success = False
             notice = notice or f"{provider} unavailable"
             if not deferred:
@@ -795,6 +821,8 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
             if rows and not notice:
                 panel.retries.succeeded(provider)
         payload = json.loads(payload)
+        if informational:
+            payload['data'][0]['informational'] = True
         payload["frameId"] = frame_id
         panel.send_frame(json.dumps(payload, allow_nan=False), frame_id)
         panel.wait_for("ack", seconds=2, frame_id=frame_id)
@@ -811,6 +839,9 @@ def main():
             cfg = load_config()
         except (ValueError, OSError) as exc:
             LOG(f"Configuration error: {exc}")
+            return 1
+        if not cfg['providers']:
+            LOG('Choose AI providers in First-time setup before starting the host.')
             return 1
         run(cfg)
     finally:

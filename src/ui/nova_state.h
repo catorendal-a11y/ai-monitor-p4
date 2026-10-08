@@ -16,7 +16,8 @@ class NovaState {
     for (size_t v = 0; v < aim::kMaxViews; ++v) {
       if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
       const auto& view = snapshot.views[v];
-      issue |= view.notice;
+      issue |= view.notice && !view.informational;
+      hasFresh |= view.valid && view.informational && tokenSignalFresh;
       if (!view.valid || !view.hasUsage || view.notice || view.fetching || now - view.quotaReceivedMs >= 300000u) continue;
       for (size_t r = 0; r < view.rowCount; ++r) {
         const auto& row = view.rows[r]; if (!row.valid) continue;

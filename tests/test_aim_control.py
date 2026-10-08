@@ -18,7 +18,7 @@ class SetupTests(unittest.TestCase):
             root = Path(directory)
             child = Mock(); child.poll.return_value = None
             with patch.object(control.sys, 'frozen', True, create=True), \
-                    patch.object(control.host, 'load_config'), patch.object(control, 'stop_host'), \
+                    patch.object(control.host, 'load_config', return_value={'providers': ['codex']}), patch.object(control, 'stop_host'), \
                     patch.object(control.subprocess, 'Popen', return_value=child) as spawn, \
                     patch.object(control.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
                 control.start_host(root)
@@ -42,7 +42,7 @@ class SetupTests(unittest.TestCase):
     def test_invalid_key_cannot_replace_valid_local_config(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            control.save_config(dict(control.host.DEFAULT_CONFIG), root)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, providers=['zcode']), root)
             before = (root / 'tools/aim_host.json').read_bytes()
             with contextlib.redirect_stdout(io.StringIO()), patch.object(control.list_ports, 'comports', return_value=[]):
                 with self.assertRaises(ValueError):

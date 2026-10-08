@@ -691,7 +691,7 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
   char vendorBuf[32];
   snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
            !view || !view->valid ? "WAITING" :
-           (!hostConnected ? "OFFLINE" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus)))));
+           (!hostConnected ? "OFFLINE" : (view->informational ? "ACTIVITY / SETUP" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus))))));
   set_label_cached(c.vendor, cache.vendor, sizeof(cache.vendor), vendorBuf);
 
   char remBuf[12];

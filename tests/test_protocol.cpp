@@ -610,6 +610,21 @@ static void token_presentation_handles_stale_sources_large_counts_and_wraparound
 }
 
 int main() {
+  {
+    aim::ProtoCore core; core.tick = [] { return 100u; };
+    feed(core, "{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":255,\"idleSeconds\":0,\"delta\":45}\n");
+    CHECK(core.snapshot().tokenSourceMask == 255);
+    feed(core, "{\"data\":[{\"provider\":\"claude\",\"notice\":\"Activity only\",\"informational\":true}]}\n");
+    CHECK(core.snapshot().views[0].informational && !core.snapshot().views[0].hasUsage);
+    NovaState state; auto warning = [](const char*, const aim::Row&) { return uint8_t{25}; };
+    CHECK(state.evaluate(core.snapshot(), 100, false, warning) == NovaMood::working);
+    auto snapshot = core.snapshot(); snapshot.tokenIdleSeconds = 100;
+    CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::ready);
+    CHECK(std::string(token_tracking_label(snapshot, 100)) == "TRACKING / multiple sources");
+    core.clear_out();
+    feed(core, "{\"data\":[{\"provider\":\"opencode\",\"notice\":\"Setup\",\"informational\":\"bad\"}]}\n");
+    CHECK(core.out().find("invalid informational flag") != std::string::npos);
+  }
   timestamp_and_ack();
   invalid_frame_keeps_snapshot();
   set_views_clears_old_data_and_rejects_bad_keys();

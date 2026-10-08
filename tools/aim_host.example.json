@@ -1,4 +1,5 @@
 {
+  "providers": [],
   "port": "auto",
   "interval_s": 240,
   "zai_key": "",

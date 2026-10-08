@@ -648,6 +648,21 @@ int main(int argc, char** argv) {
   screenshot(screenshots, "nova-active-while-dimmed");
   sample.tokenIdleSeconds = 300; ui_nova_update(); CHECK(nova_ui::mood == NovaMood::resting);
   screenshot(screenshots, "nova-resting");
+  set_sample(2, 1);
+  for (size_t i = 0; i < 2; ++i) {
+    const char* key = i == 0 ? "claude" : "gemini";
+    std::strcpy(sample.viewKeys[i], key); std::strcpy(sample.views[i].providerKey, key);
+    sample.views[i].hasUsage = false; sample.views[i].rowCount = 0;
+    sample.views[i].notice = sample.views[i].informational = true;
+    std::strcpy(sample.views[i].message, "Local token activity; quota unavailable");
+  }
+  sample.tokenUsageKnown = sample.tokenUsageSeen = true; sample.tokenSourceMask = 12;
+  sample.tokenActivityMs = fakeTick; sample.lastTokenDelta = 6500; sample.tokenIdleSeconds = 0;
+  ui_nova_show();
+  CHECK(nova_ui::mood == NovaMood::working);
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "LOCAL");
+  CHECK(lv_obj_is_hidden(nova_ui::providers[0].bar));
+  screenshot(screenshots, "nova-claude-gemini");
   idle_dim_touch(true); idle_dim_touch(false); nightSettings.enabled = false;
   set_sample(8, 3); sample.manualRefreshSupported = true;
   ui_nova_update(); CHECK(nova_ui::pageCount == 4);

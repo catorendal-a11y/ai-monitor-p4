@@ -19,7 +19,7 @@ static lv_obj_t *title = nullptr, *subtitle = nullptr, *hint = nullptr, *clock =
 static lv_obj_t* tracking = nullptr;
 static lv_obj_t *updateButton = nullptr, *updateLabel = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 struct ProviderCard {
-  lv_obj_t *card = nullptr, *icon = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
+  lv_obj_t *card = nullptr, *icon = nullptr, *logoBox = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
   uint8_t view = 0;
   uint32_t color = UINT32_MAX;
   const lv_image_dsc_t* logo = nullptr;
@@ -106,6 +106,7 @@ void init() {
     lv_obj_set_scrollable(item.card, false);
     lv_obj_add_event_cb(item.card, details, LV_EVENT_CLICKED, &item);
     auto* logoBox = lv_obj_create(item.card); lv_obj_set_pos(logoBox, 4, 8); lv_obj_set_size(logoBox, 48, 48);
+    item.logoBox = logoBox;
     lv_obj_set_style_bg_color(logoBox, lv_color_hex(0x0A1114), 0);
     lv_obj_set_style_border_color(logoBox, lv_color_hex(ui_theme::border), 0);
     lv_obj_set_style_border_width(logoBox, 1, 0); lv_obj_set_style_pad_all(logoBox, 0, 0);
@@ -199,6 +200,10 @@ void update() {
     const auto* brand = nova_assets::logo_for(key, 48);
     if (brand != item.logo) { item.logo = brand; if (brand) lv_image_set_src(item.icon, brand); }
     lv_obj_set_hidden(item.icon, !brand);
+    lv_obj_set_hidden(item.logoBox, !brand);
+    lv_obj_set_x(item.name, brand ? 62 : 8);
+    lv_obj_set_x(item.bar, brand ? 62 : 8); lv_obj_set_width(item.bar, brand ? 240 : 294);
+    lv_obj_set_x(item.status, brand ? 62 : 8); lv_obj_set_width(item.status, brand ? 240 : 294);
     text(item.name, style ? style->label : key);
     const aim::Row* selectedRow = &view.rows[0];
     bool hasRow = false; float remaining = 0; unsigned severity = 0;
@@ -215,11 +220,13 @@ void update() {
     const uint32_t color = !fresh ? ui_theme::muted : (quota_critical(remaining, key, row) ? 0xFF5252 :
                             (quota_low(remaining, key, row) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
     if (item.color != color) { item.color = color; lv_obj_set_style_bg_color(item.bar, lv_color_hex(color), LV_PART_INDICATOR); }
-    if (hasRow) format_percent(remaining, true, value, sizeof(value)); else snprintf(value, sizeof(value), "--");
+    if (view.informational) snprintf(value, sizeof(value), "LOCAL");
+    else if (hasRow) format_percent(remaining, true, value, sizeof(value)); else snprintf(value, sizeof(value), "--");
     text(item.percent, value);
+    lv_obj_set_hidden(item.bar, view.informational);
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
-    const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.notice ? "ERROR / last good" :
-                          (view.fetching ? "UPDATING / last good" : (!hasRow ? "Waiting for data" : (!fresh ? "STALE / last good" : row.title))));
+    const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
+                          (view.fetching ? "UPDATING / last good" : (!hasRow ? "Waiting for data" : (!fresh ? "STALE / last good" : row.title)))));
     text(item.status, status);
   }
 }

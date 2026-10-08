@@ -4,11 +4,11 @@
 
 Use Windows 10/11 x64, the **GUITION JC4880P433 ESP32-P4** display and a USB data cable. No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** on this repository and download **ai-monitor-p4-v1.10.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
+1. Open **Releases** on this repository and download **ai-monitor-p4-v1.11.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
 2. Right-click the ZIP and choose **Extract All**. Keep the entire folder together in a writable location, such as Documents. Do not run it inside the ZIP.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
-4. Choose **1 â€” First-time setup**. Select the display's USB port from the numbered list. Leave the optional Z.AI key empty for Codex-only use. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.
-5. For a new board, choose **4 â€” Install / update display firmware**, then **1 â€” First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Skip this step if AI Monitor P4 is already installed.**
+4. Choose **1 â€” First-time setup**. Explicitly select the AI providers you use; none are preselected. Then select the display's USB port. The optional Z.AI key is requested only if you choose ZCode. See [provider-specific setup](PROVIDERS.md) for Claude and other choices. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.
+5. For a new board, choose **4 â€” Install / update display firmware**, then **1 â€” First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Skip this only if firmware v1.11.0+ is already installed. On v1.10.x, choose the application update for additional providers.**
 6. Choose **2 â€” Start host**. The companion runs in the background. Close the menu; keep the display connected. NOVA appears on the display when the host connects.
 
 For Codex quota data, sign in through the [Codex CLI](https://developers.openai.com/codex/cli/) on this computer first. Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).

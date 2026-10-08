@@ -500,7 +500,7 @@ class ConfigReloadTests(unittest.TestCase):
 
     def test_new_configuration_changes_interval_and_view_set(self):
         panel, watcher = Mock(), Mock()
-        changed = dict(host.DEFAULT_CONFIG, interval_s=60, zai_key="test-key", port="COM_TEST")
+        changed = dict(host.DEFAULT_CONFIG, providers=['codex', 'zcode'], interval_s=60, zai_key="test-key", port="COM_TEST")
         watcher.take.side_effect = [changed]
         with patch.object(host, "ConfigWatcher", return_value=watcher), \
                 patch.object(host, "find_port", return_value="COM_TEST") as find, \

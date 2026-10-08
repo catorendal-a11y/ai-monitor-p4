@@ -31,6 +31,7 @@ struct Row {
 struct ViewData {
   bool valid = false;
   bool notice = false;           // host sent a notice instead of usage rows
+  bool informational = false;    // activity-only/setup message, not an API error
   bool fetching = false;         // host is mid-poll for this provider
   bool showsRemaining = false;   // percentMode "remaining"
   char providerKey[16] = {0};    // wire key, e.g. "claude"
@@ -94,6 +95,7 @@ inline const ProviderStyle* provider_style(const char* key) {
       {"gemini", "GEMINI", 0x4285F4u},
       {"copilot", "COPILOT", 0xA371F7u},
       {"cursor", "CURSOR", 0x9AD1D4u},
+      {"opencode", "OPENCODE", 0xB9B9C7u},
   };
   for (const auto& entry : kTable) {
     if (key && std::strcmp(entry.key, key) == 0) return &entry;

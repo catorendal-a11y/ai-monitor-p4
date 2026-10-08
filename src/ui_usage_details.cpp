@@ -216,6 +216,7 @@ void ui_details_update() {
            !snapshot.hostPresent ? "OFFLINE" : (view.notice ? "ERROR" : (view.fetching ? "FETCHING" : (!fresh ? "STALE" : "CONNECTED"))),
            static_cast<unsigned long>((now - view.quotaReceivedMs) / 60000));
   if (!view.hasUsage) snprintf(text, sizeof(text), "%s / No successful measurement yet", snapshot.hostPresent ? "CONNECTED" : "OFFLINE");
+  if (view.informational) snprintf(text, sizeof(text), "%s / ACTIVITY ONLY / Quota not available", snapshot.hostPresent ? "CONNECTED" : "OFFLINE");
   detail_text(status, text);
   const bool retained = !changed && view.notice && view.hasUsage;
   lv_obj_set_hidden(errorBanner, !retained || historyMode);

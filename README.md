@@ -1,8 +1,8 @@
 # AI Monitor P4
 
-NOVA is a touchscreen desk companion that shows AI usage limits and reacts to registered token activity from Codex and ZCode.
+NOVA is a touchscreen desk companion that shows AI usage limits and reacts to registered token activity from the AI providers you select.
 
-**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.10.0. UI, setup and documentation are in English.
+**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.11.0. UI, setup and documentation are in English.
 
 ![NOVA interface](docs/nova-preview.png)
 
@@ -10,12 +10,12 @@ Preview rendered from the real UI with synthetic test data.
 
 ## Start here
 
-**Windows 10/11 x64:** download **ai-monitor-p4-v1.10.0-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
+**Windows 10/11 x64:** download **ai-monitor-p4-v1.11.0-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
 
 1. Connect the screen with a USB data cable.
-2. Choose **1 â€” First-time setup** and select its USB port.
-3. On a new board, choose **4 â€” Install / update firmware**, then **1 â€” First installation**. Confirm the correct board/port. Skip this if AI Monitor P4 is already installed.
-4. Choose **2 â€” Start host** and close the menu. The companion keeps running invisibly.
+2. Choose **1 - First-time setup**, explicitly select your AI providers, then select the USB port.
+3. On a new board, choose **4 - Install / update firmware**, then **1 - First installation**. Confirm the correct board/port. Skip this only on firmware v1.11.0+. Use the application update on older AI Monitor firmware.
+4. Choose **2 - Start host** and close the menu. The companion keeps running invisibly.
 
 [Step-by-step guide and troubleshooting](docs/QUICK_START.md)
 
@@ -34,18 +34,21 @@ Official setup help: [Codex CLI](https://developers.openai.com/codex/cli/) and [
 
 You never paste an OpenAI password or token into setup. ZCode's encrypted app login is not imported. The optional Z.AI key stays in local `tools/aim_host.json`; input is hidden. Enter preserves a saved key and `clear` removes it. `ZAI_API_KEY` in the process environment takes precedence over a saved key. The host does not load `.env` files automatically.
 
+New installations have no AI preselected. Only chosen providers are monitored. See [provider support and setup](docs/PROVIDERS.md) for Claude Code, Gemini CLI, Copilot, Cursor, Antigravity and OpenCode, including which choices need an external bridge.
+
 No keys are included in the public package. Configurations, logs and databases stay local and are ignored by Git. The firmware contains no cloud credentials. The companion uses internet access for quota queries; the panel connects by USB.
 
 ## Menu
 
 | Choice | Result |
 | --- | --- |
-| 1. First-time setup | Select USB port and optionally configure ZCode quota. Existing settings are kept. |
+| 1. First-time setup | Choose AI providers and USB port. Configure ZCode only if selected. Existing settings are kept. |
 | 2. Start host | Starts this folder's companion in the background. Closing the menu leaves it running. |
 | 3. Stop host | Stops only hosts belonging to this folder. |
 | 4. Install / update firmware | Checks the supplied firmware hash, asks for board/port confirmation, then flashes. First installation resets settings; application updates need the existing AI Monitor partition layout. |
 | 5. Status | Shows local login availability, USB ports and readable token sources without making API calls. |
 | 6. View recent log | Shows recent connection and polling messages. |
+| 7. Provider integration help | Shows selected-provider requirements and optionally installs the Claude quota bridge. |
 
 ## On the screen
 

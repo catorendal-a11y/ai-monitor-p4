@@ -53,6 +53,8 @@ def main():
         relative = Path(name)
         if any(part in {'.git', '.pio', '.venv', '.codex', '.zcode', 'node_modules', 'work', '__pycache__', 'outputs'} for part in relative.parts):
             raise RuntimeError('Private/generated path in tracked release source')
+        if relative.parts[:2] == ('tools', 'activity'):
+            raise RuntimeError('Runtime activity records must not be exported')
         if relative.name in {'aim_host.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
                 (relative.name.startswith('.env.') and relative.name != '.env.example') or \
                 relative.suffix in {'.log', '.db', '.sqlite', '.sqlite3', '.jsonl', '.lock', '.bin', '.exe', '.lnk', '.pem', '.key'}:

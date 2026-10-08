@@ -11,6 +11,8 @@ foreach ($taskCandidate in $taskCandidates | Select-Object -Unique) {
     if ($LASTEXITCODE -eq 0) { $taskPython = $taskCandidate; break }
 }
 if (-not $taskPython) { throw 'Python with pyserial was not found. Install tools/requirements.txt.' }
+& $taskPython -c 'import sys; sys.path.insert(0,sys.argv[1]); import aim_host; sys.exit(0 if aim_host.load_config()["providers"] else 1)' $PSScriptRoot 1>$null 2>$null
+if ($LASTEXITCODE -ne 0) { throw 'Complete First-time setup in AI-Monitor.bat and choose valid AI providers before starting the host.' }
 $taskPythonw = Join-Path (Split-Path $taskPython -Parent) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $taskPythonw)) { $taskPythonw = $taskPython }
 
