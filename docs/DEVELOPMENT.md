@@ -86,7 +86,7 @@ NOVA follows **increases in local numeric token counters**, independently of key
 - Codex: `threads.tokens_used` in `~/.codex/state_5.sqlite`.
 - ZCode: `model_usage.computed_total_tokens` in `~/.zcode/cli/db/db.sqlite`.
 
-The companion uses read-only SQLite connections and reads numeric counters plus identifiers, not conversations. It checks approximately every two seconds, including during API requests. Existing totals establish a baseline and do not count as new activity.
+The companion uses read-only SQLite queries for Codex/ZCode. Claude/Gemini log adapters parse selected local records to retain usage counters and record IDs; conversation text is not retained, logged or exported. It checks approximately every two seconds, including during API requests. Existing totals establish a baseline and do not count as new activity. See [provider support](PROVIDERS.md) for configuration and limitations.
 
 NOVA's TRACKING line names the currently readable sources, not which application generated the last increase. The robot caption shows elapsed time since the last increase. Large increments use compact units (K/M/B and higher, truncated to one decimal); the USB info response retains the exact count. Unavailable or stale signals are shown explicitly. Quota cards distinguish updates in progress from stale measurements.
 

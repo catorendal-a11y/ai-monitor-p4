@@ -1,4 +1,4 @@
-"""Read numeric local token counters only. No chat content or credentials."""
+"""Read selected local usage metrics; retain no conversation content."""
 import sqlite3
 from contextlib import closing
 from collections import OrderedDict

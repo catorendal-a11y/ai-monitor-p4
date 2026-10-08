@@ -32,7 +32,6 @@ class SelectionTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(control.choose_providers([], lambda _: next(replies)), ['claude', 'gemini'])
         for value in [['unknown'], ['claude', 'claude'], 'claude', None]:
-            if value is None: continue
             with self.assertRaises(ValueError): selected_providers({'providers': value})
 
     def test_legacy_profiles_keep_previous_selection_but_new_empty_profile_does_not(self):

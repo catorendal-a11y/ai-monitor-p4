@@ -13,7 +13,7 @@ PROVIDERS = {
 
 def selected_providers(config, legacy=False):
     values = config.get('providers')
-    if values is None:
+    if 'providers' not in config:
         # Preserve the choices implied by old installed configs, never a new installation.
         values = ['codex'] + (['zcode'] if config.get('zai_key') else []) if legacy else []
     if not isinstance(values, list) or len(values) > len(PROVIDERS) or any(not isinstance(v, str) or v not in PROVIDERS for v in values):
