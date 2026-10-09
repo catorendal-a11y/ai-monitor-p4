@@ -107,6 +107,7 @@ History stores valid samples in five-minute buckets for up to 24 hours since fir
 Python tests use fake responses and temporary databases; no device or credentials are required:
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install -r scripts/requirements-test.txt
 .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 

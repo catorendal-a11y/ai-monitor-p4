@@ -13,6 +13,8 @@ The portable Windows archive lets users run the companion and flash the display 
 
 The workflow needs `contents: write` only in its draft-release job, uses GitHub's provided token, and contains no project API keys. A normal branch push runs CI but does not create a release. Failed or existing-tag releases must be resolved by the maintainer rather than silently replacing a published asset.
 
+The build jobs have read-only repository permission and do not retain checkout credentials. A separate publisher downloads the same run's package and creates the draft without checking out or executing source or generated programs. Version tags must already exist and are administrator-created. The owner reviews the draft before publishing. Future published releases are immutable: finish all asset uploads in the draft, then publish; subsequent fixes require a new version. See [GitHub security](GITHUB_SECURITY.md).
+
 ## Local build on Windows
 
 Use Python 3.12 x64 and a clean checkout. Install host dependencies plus the pinned release tools in an isolated virtual environment:

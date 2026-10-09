@@ -18,6 +18,8 @@ These protections do not protect against malware already running as your Windows
 
 [Review evidence and limits](docs/SECURITY_REVIEW.md)
 
+[GitHub permissions, external contributions and release safeguards](docs/GITHUB_SECURITY.md)
+
 ## Reporting
 
 If the published GitHub repository enables private reporting, use **Security → Report a vulnerability**. Otherwise contact the repository owner privately through a channel listed on their GitHub profile. Do not post exploit details, credentials or account data in public issues. This source package contains no maintainer email or promised response deadline.

@@ -22,6 +22,8 @@ Use `.venv\Scripts\python.exe` on Windows or `.venv/bin/python` elsewhere.
 
 Read `docs/PROVIDER_ROADMAP.md` before adding providers. `tools/codex_support.py` prepares the official client only when a user explicitly selects Codex and accepts installation/sign-in. Its account RPC path reads quota without starting model turns. Test onboarding using subprocess fixtures; never log into a real account during development.
 
+Install `scripts/requirements-test.txt` for the workflow permission regression tests. Read `docs/GITHUB_SECURITY.md` before changing workflow permissions or release publishing; build jobs must never receive repository write access.
+
 ```text
 python -m platformio run -e esp32p4-release
 python -m unittest discover -s tests -p "test_*.py"
