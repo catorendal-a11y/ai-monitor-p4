@@ -2,7 +2,7 @@
 
 A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4 4.3-inch touchscreen**. A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
 
-Release: **v1.12.0**. The interface, code comments and documentation are in English.
+Release: **v1.12.1**. The interface, code comments and documentation are in English.
 
 ## Features
 
