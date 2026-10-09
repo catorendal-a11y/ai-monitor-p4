@@ -16,6 +16,7 @@ from serial.tools import list_ports
 import aim_host as host
 from provider_catalog import PROVIDERS, selected_providers
 import base64
+from codex_support import setup_codex, codex_command
 
 
 class SetupError(ValueError):
@@ -114,6 +115,9 @@ def configure(root=ROOT, ask=input, read_secret=getpass.getpass):
     config["zai_provider"] = "zcode"
     save_config(config, root)
     print("Saved tools/aim_host.json. Existing settings were preserved.")
+    if 'codex' in config['providers']:
+        try: setup_codex(ask)
+        except RuntimeError as error: raise SetupError(str(error)) from None
     print("Use Start host next, or Install firmware if this is a new display.")
 
 
@@ -240,7 +244,8 @@ def status(root=ROOT):
     print(f"Host: {'running' if owned_hosts(root) else 'stopped'} / USB port: {config['port']}")
     print('Selected providers: ' + (', '.join(PROVIDERS[key][0] for key in providers) or 'none - open First-time setup'))
     if 'codex' in providers:
-        print(f"Codex CLI login file: {'found' if host.CODEX_AUTH.is_file() else 'missing - sign in to Codex CLI'}")
+        print(f"Official Codex CLI: {'found' if codex_command() else 'missing - run First-time setup'}")
+        print('Quota uses the CLI account interface; legacy file login is a fallback when the CLI is absent.')
     if 'zcode' in providers:
         print(f"ZCode quota key: {'configured' if os.environ.get('ZAI_API_KEY') or config.get('zai_key') else 'optional, not configured'}")
     counters = host.TokenReporter(providers=providers, activity_dir=root / 'tools/activity').poll()
@@ -266,6 +271,9 @@ def integration_help(root=ROOT, ask=input, home=None):
     for key in config['providers']:
         print(PROVIDERS[key][0] + ': ' + PROVIDERS[key][2])
     print('Full instructions: docs/PROVIDERS.md. No app passwords or browser cookies are imported.')
+    if 'codex' in config['providers']:
+        try: setup_codex(ask)
+        except RuntimeError as error: raise SetupError(str(error)) from None
     if 'claude' not in config['providers']: return
     settings = (Path.home() if home is None else Path(home)) / '.claude/settings.json'
     print('Optional Claude quota bridge uses the documented statusline fields.')

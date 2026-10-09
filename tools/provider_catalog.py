@@ -1,6 +1,6 @@
 """Explicit provider choices and their supported data sources."""
 PROVIDERS = {
-    'codex': ('Codex', 1, 'Local tokens + existing CLI-login quota adapter'),
+    'codex': ('Codex', 1, 'Automatic official CLI setup + local tokens and account quota'),
     'zcode': ('ZCode', 2, 'Local tokens + optional Z.AI coding-plan quota key'),
     'claude': ('Claude Code', 4, 'Local CLI token logs + optional official statusline quota bridge'),
     'gemini': ('Gemini CLI', 8, 'Local CLI tokens; automatic account quota not available'),

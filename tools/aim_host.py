@@ -27,6 +27,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter
 from provider_catalog import selected_providers, PROVIDERS
+from codex_support import codex_command, codex_home, read_rate_limits
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
 import serial
@@ -34,7 +35,7 @@ from serial.tools import list_ports
 
 HERE = Path(sys.executable).resolve().parent / "tools" if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "aim_host.json"
-CODEX_AUTH = Path.home() / ".codex" / "auth.json"
+CODEX_AUTH = codex_home() / 'auth.json'
 MAX_FRAME_BYTES = 4095
 HEARTBEAT_SECONDS = 10
 MAX_RESPONSE_BYTES = 65536
@@ -307,6 +308,33 @@ _ctx = ssl.create_default_context()
 
 def fetch_codex():
     """Codex (ChatGPT plan) usage via the local Codex CLI login token."""
+    command = codex_command()
+    if command:
+        try:
+            data = read_rate_limits(command)
+            buckets = data.get('rateLimitsByLimitId')
+            limit = buckets.get('codex') if isinstance(buckets, dict) else None
+            if limit is None: limit = data.get('rateLimits')
+            if not isinstance(limit, dict) or limit.get('limitId') not in (None, 'codex'):
+                raise ValueError('No supported Codex quota bucket')
+            rows = []
+            for key, title in [('primary','Session'),('secondary','Secondary')]:
+                window = limit.get(key)
+                if window is None: continue
+                if not isinstance(window, dict): raise ValueError('Invalid Codex window')
+                minutes = window.get('windowDurationMins')
+                if minutes is None: minutes = 0
+                if type(minutes) is not int or not 0 <= minutes <= 0xffffffff: raise ValueError('Invalid window duration')
+                reset = window.get('resetsAt')
+                percent = percent_value(window.get('usedPercent'))
+                if percent > 100: raise ValueError('Invalid quota percentage')
+                rows.append({'title':'Week' if key == 'secondary' and minutes == 10080 else title,
+                             'usedPercent':percent,
+                             'windowMinutes':minutes, 'resetsAt':now_iso_epoch(reset) if reset is not None else ''})
+            if not rows: return None, 'Codex: no plan quota; sign in to CLI with ChatGPT'
+            return rows, None
+        except Exception:
+            return None, 'Codex: quota unavailable; retry setup or update the official CLI'
     try:
         auth = json.loads(CODEX_AUTH.read_text(encoding="utf-8-sig"))
         access = (auth.get("tokens") or {}).get("access_token")

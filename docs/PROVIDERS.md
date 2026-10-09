@@ -6,7 +6,7 @@ First-time setup has **no preselected AI**. Choose one or more numbered provider
 
 | Choice | Automatic local token activity | Quota display | Setup |
 | --- | --- | --- | --- |
-| Codex | Numeric counters in the default local Codex SQLite database | Existing CLI-login quota adapter | Choose Codex; sign in with the local Codex CLI for quota access. |
+| Codex | Numeric counters in the default local Codex SQLite database | Official CLI account interface, with legacy file fallback | Choose Codex; setup offers official installation/sign-in as needed. See CODEX_SETUP.md. |
 | ZCode | Numeric request counters in the local ZCode SQLite database | Existing Z.AI coding-plan adapter | Choose ZCode. Its optional coding-plan key is requested only for this selection. |
 | Claude Code | Assistant usage fields from local CLI JSONL transcripts; repeated message IDs are deduplicated | Documented statusline rate-limit fields when supplied | Choose Claude. Local CLI logging is used automatically. Menu 7 offers the optional quota bridge. |
 | Gemini CLI | Reported token totals from recorded CLI JSON/JSONL sessions | No automatic account-quota adapter | Choose Gemini CLI and use it normally with session recording. |

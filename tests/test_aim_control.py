@@ -13,6 +13,9 @@ import aim_control as control
 
 
 class SetupTests(unittest.TestCase):
+    def setUp(self):
+        prepare = patch.object(control, 'setup_codex', return_value=True)
+        prepare.start(); self.addCleanup(prepare.stop)
     def test_frozen_host_outlives_menu_using_independent_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

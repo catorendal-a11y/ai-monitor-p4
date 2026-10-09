@@ -11,7 +11,7 @@ Use Windows 10/11 x64, the **GUITION JC4880P433 ESP32-P4** display and a USB dat
 5. For a new board, choose **4 â€” Install / update display firmware**, then **1 â€” First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Skip this only if firmware v1.12.0+ is already installed. On v1.10.x, choose the application update for additional providers.**
 6. Choose **2 â€” Start host**. The companion runs in the background. Close the menu; keep the display connected. NOVA appears on the display when the host connects.
 
-For Codex quota data, sign in through the [Codex CLI](https://developers.openai.com/codex/cli/) on this computer first. Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).
+When you choose Codex, setup offers the official CLI installer and its sign-in flow automatically when needed. Accept the offered steps with your own account; [Codex setup guide](CODEX_SETUP.md). Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).
 
 ## Personalize the display
 

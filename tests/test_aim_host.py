@@ -546,6 +546,9 @@ class ConfigTests(unittest.TestCase):
 
 
 class ProviderTests(unittest.TestCase):
+    def setUp(self):
+        legacy = patch.object(host, 'codex_command', return_value=None)
+        legacy.start(); self.addCleanup(legacy.stop)
     def test_explicit_rejection_does_not_accept_success_code(self):
         context = self.response({"success": False, "code": 200, "data": {"limits": [
             {"type": "CREDIT_LIMIT", "unit": 3, "percentage": 25}]}})

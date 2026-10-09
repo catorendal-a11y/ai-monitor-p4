@@ -6,13 +6,16 @@ import time
 from pathlib import Path
 from local_activity import LocalActivity
 from provider_catalog import PROVIDERS
+from codex_support import codex_home
 
 
 class TokenReporter:
     MAX_TRACKED = 8192  # Keep recent IDs across temporarily missing/evicted query rows.
     def __init__(self, home=None, clock=None, providers=None, activity_dir=None):
-        home = Path.home() if home is None else Path(home)
+        default_home = home is None
+        home = Path.home() if default_home else Path(home)
         self.paths = {"codex": home / ".codex/state_5.sqlite", "zcode": home / ".zcode/cli/db/db.sqlite"}
+        if default_home: self.paths['codex'] = codex_home() / 'state_5.sqlite'
         self.paths.update(claude=home / '.claude/projects', gemini=home / '.gemini/tmp')
         self.providers = ['codex', 'zcode'] if providers is None else list(providers)
         self.activity_dir = Path(activity_dir) if activity_dir is not None else None

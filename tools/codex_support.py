@@ -1,0 +1,135 @@
+"""Official Codex CLI onboarding and read-only account rate limits."""
+import json
+import os
+from pathlib import Path
+import queue
+import shutil
+import subprocess
+import threading
+import time
+import psutil
+
+MAX_REPLY_BYTES = 65536
+
+
+def codex_home():
+    return Path(os.environ.get('CODEX_HOME') or Path.home() / '.codex').expanduser()
+
+
+def codex_command():
+    candidates = [shutil.which('codex.exe'), shutil.which('codex')]
+    install = os.environ.get('CODEX_INSTALL_DIR')
+    if install: candidates += [str(Path(install) / ('codex.exe' if os.name == 'nt' else 'codex'))]
+    if os.name == 'nt':
+        candidates += [str(Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'Programs/OpenAI/Codex/bin/codex.exe')]
+    else:
+        candidates += [str(Path.home() / '.local/bin/codex')]
+    for candidate in candidates:
+        if not candidate or not Path(candidate).is_file(): continue
+        path = Path(candidate)
+        if path.suffix.lower() in ('.cmd','.bat'):
+            script = path.parent / 'node_modules/@openai/codex/bin/codex.js'
+            node = shutil.which('node.exe') or shutil.which('node')
+            if node and script.is_file(): return [node, str(script)]
+            continue
+        return [str(path)]
+    return None
+
+
+def install_command():
+    if os.name == 'nt':
+        return ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-Command',
+                'irm https://chatgpt.com/codex/install.ps1 | iex']
+    return ['sh','-c','curl -fsSL https://chatgpt.com/codex/install.sh | sh']
+
+
+def setup_codex(ask=input):
+    command = codex_command()
+    if not command:
+        print('Codex CLI is missing. The official OpenAI installer prepares it for this account.')
+        if ask('Install the official Codex CLI now? [Y/n]: ').strip().lower() not in ('','y','yes'):
+            print('Skipped. Codex remains selected; use Provider integration help to finish setup.')
+            return False
+        if subprocess.run(install_command(), check=False).returncode:
+            raise RuntimeError('Official Codex installation failed. Check the connection and retry setup.')
+        command = codex_command()
+        if not command: raise RuntimeError('Codex was not found after installation. Restart the menu and retry.')
+    # Do not copy or echo CLI status output; credentials belong to the official client.
+    try:
+        status = subprocess.run(command + ['login','status'], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15, check=False)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError('Codex login status timed out. Open the official CLI and finish sign-in, then retry.') from None
+    if status.returncode:
+        print('Codex needs sign-in. Use your own ChatGPT account in the official browser/CLI flow.')
+        if ask('Open official Codex sign-in now? [Y/n]: ').strip().lower() not in ('','y','yes'):
+            print('Skipped. Codex remains selected; no other provider was enabled.')
+            return False
+        # Interactive, inherited console. Never read a password/token from the monitor UI.
+        if subprocess.run(command + ['login'], check=False).returncode:
+            raise RuntimeError('Codex sign-in did not finish. Retry through Provider integration help.')
+    print('Codex CLI is prepared. Quota requires a ChatGPT-backed login; API-key-only mode has no plan quota here.')
+    print('Existing account storage and global Codex settings were preserved.')
+    return True
+
+
+def read_rate_limits(command, timeout=20):
+    process = subprocess.Popen(command + ['app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+    replies = queue.Queue(maxsize=64)
+    def read():
+        try:
+            while True:
+                raw = process.stdout.readline(MAX_REPLY_BYTES + 1)
+                if not raw: break
+                if len(raw) > MAX_REPLY_BYTES: break
+                try: message = json.loads(raw)
+                except (ValueError, UnicodeError): continue
+                if isinstance(message, dict):
+                    try: replies.put_nowait(message)
+                    except queue.Full: break
+        except OSError:
+            pass
+        finally:
+            try: replies.put_nowait(None)
+            except queue.Full: pass
+    worker = threading.Thread(target=read, daemon=True); worker.start()
+    deadline = time.monotonic() + timeout
+    def send(message):
+        process.stdin.write(json.dumps(message).encode() + b'\n'); process.stdin.flush()
+    def response(identifier):
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0: raise TimeoutError('Codex account request timed out')
+            try: message = replies.get(timeout=remaining)
+            except queue.Empty: raise TimeoutError('Codex account request timed out') from None
+            if message is None: raise RuntimeError('Codex app-server stopped')
+            if message.get('id') != identifier: continue
+            if 'error' in message: raise RuntimeError('Codex account rate limits unavailable; check CLI login/version')
+            if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
+            return message['result']
+    try:
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.12.0'}}})
+        response(1); send({'method':'initialized','params':{}})
+        send({'method':'account/rateLimits/read','id':2})
+        return response(2)
+    finally:
+        children = []
+        if process.poll() is None:
+            try: children = psutil.Process(process.pid).children(recursive=True)
+            except psutil.Error: pass
+        for child in children:
+            try: child.terminate()
+            except psutil.NoSuchProcess: pass
+        if process.poll() is None: process.terminate()
+        try: process.wait(timeout=3)
+        except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=3)
+        _, alive = psutil.wait_procs(children, timeout=3)
+        for child in alive:
+            try: child.kill()
+            except psutil.NoSuchProcess: pass
+        worker.join(timeout=1)
+        for stream in [process.stdin, process.stdout]:
+            if stream:
+                try: stream.close()
+                except OSError: pass
