@@ -1,11 +1,17 @@
-# AI Monitor P4
+# AI Monitor P4 — ESP32-P4 AI Desk Companion
 
-A USB touchscreen desk companion for your AI tools. See usage limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
+A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
+
+![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
 [![Build and test](https://github.com/catorendal-a11y/ai-monitor-p4/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/catorendal-a11y/ai-monitor-p4/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md)
+**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/q-a)
+
+**Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to the ESP32-P4 over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
+
+**Two animated robots · Four color themes · No AI preselected · Portable Windows setup**
 
 ## Meet your desk companion
 
@@ -108,6 +114,10 @@ No maintainer credentials are included in the source or release. Your optional Z
 [Security and private reporting](SECURITY.md) · [Host security review](docs/SECURITY_REVIEW.md) · [GitHub safeguards](docs/GITHUB_SECURITY.md)
 
 ## Run from source or contribute
+
+Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/ai-monitor-p4/issues/new/choose). Keep keys, account data and private logs out of posts.
+
+If the project helps your setup, a GitHub star makes it easier to find again. Follow the repository's releases to hear about updates.
 
 Source installations require **Python 3.10+**. On Windows, double-click **AI-Monitor.bat** to create the local environment and open the menu. On Linux/macOS:
 
