@@ -34,6 +34,9 @@ def main():
                         "-I", str(json_include), str(ROOT / "tests/test_protocol.cpp"), "-o", str(binary)],
                        cwd=ROOT, check=True)
         subprocess.run([str(binary)], cwd=ROOT, check=True)
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-DAIM_BOARD_WAVESHARE_S3=1", "-I", str(ROOT / "src"),
+                        "-I", str(json_include), str(ROOT / "tests/test_protocol.cpp"), "-o", str(binary)], cwd=ROOT, check=True)
+        subprocess.run([str(binary)], cwd=ROOT, check=True)
         settings_binary = Path(directory) / ("settings-tests.exe" if os.name == "nt" else "settings-tests")
         subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
                         "-I", str(ROOT / "tests/native"), str(ROOT / "tests/test_settings.cpp"), "-o", str(settings_binary)],
@@ -51,6 +54,8 @@ def main():
         binary = build / ("test_ui.exe" if os.name == "nt" else "test_ui")
         screenshots = args.screenshots.resolve() if args.screenshots else scratch / "ui-previews"
         subprocess.run([str(binary), str(screenshots)], cwd=ROOT, check=True)
+        s3_binary = build / ("test_ui_s3.exe" if os.name == "nt" else "test_ui_s3")
+        subprocess.run([str(s3_binary), str(screenshots / 's3')], cwd=ROOT, check=True)
     print("All requested regressions passed.")
 
 

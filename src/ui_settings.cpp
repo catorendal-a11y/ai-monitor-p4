@@ -292,7 +292,7 @@ void ui_settings_init() {
   lv_obj_set_scrollable(card, false);
   lv_obj_set_clickable(card, false);
 
-  make_label(card, 24, 20, 420, "DAY BRIGHTNESS", &lv_font_montserrat_16, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  make_label(card, 24, 20, 420, board_profile::visual_dimming ? "VISUAL BRIGHTNESS (LED ON/OFF)" : "DAY BRIGHTNESS", &lv_font_montserrat_16, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
   brightnessValue = make_label(card, 600, 12, 128, "", &lv_font_montserrat_30, ui_theme::text, LV_TEXT_ALIGN_RIGHT);
   brightnessSlider = lv_slider_create(card);
   lv_obj_set_pos(brightnessSlider, 24, 64);
@@ -321,12 +321,14 @@ void ui_settings_init() {
                                reinterpret_cast<void*>(i), &dimLabels[i]);
   }
   previewButton = make_button(card, 560, 204, 168, "TEST DIM", dim_preview_cb, nullptr);
-  make_label(card, 24, 278, 704, "First touch wakes only. Release before the next tap.",
+  make_label(card, 24, 278, 704, board_profile::visual_dimming ?
+             "Visual dimming; LEDs stay on above 0%. First touch wakes only." :
+             "First touch wakes only. Release before the next tap.",
              &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(settingsScreen, 24, 424, 152, "<  BACK", back_cb, nullptr);
   nightButton = make_button(settingsScreen, 200, 424, 176, "NIGHT MODE", open_night, nullptr);
   make_button(settingsScreen, 392, 424, 176, "APPEARANCE", open_appearance, nullptr);
-  make_label(settingsScreen, 592, 440, 184, "AI Monitor P4 " FW_VERSION, &lv_font_montserrat_14,
+  make_label(settingsScreen, 592, 440, 184, "AI Monitor " FW_VERSION, &lv_font_montserrat_14,
              ui_theme::muted, LV_TEXT_ALIGN_RIGHT);
   lastDimChoice = lastPresetValue = 255;
   refresh_brightness();

@@ -1,8 +1,8 @@
 # Developer guide
 
-A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4 4.3-inch touchscreen**. A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
+A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4** and an experimental **original Waveshare ESP32-S3-Touch-LCD-4.3** target. [Board compatibility](BOARDS.md). A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
 
-Release: **v1.12.1**. The interface, code comments and documentation are in English.
+Release: **v1.13.0**. The interface, code comments and documentation are in English.
 
 ## Features
 
@@ -19,6 +19,8 @@ Release: **v1.12.1**. The interface, code comments and documentation are in Engl
 The target has a ST7701S 480 x 800 MIPI-DSI panel, GT911 touch, 16 MB flash and 32 MB PSRAM. LVGL presents an 800 x 480 landscape interface. Touch uses GPIO 7/8; backlight PWM uses GPIO 23. Other boards require review of their display initialization and pin assignments.
 
 [platformio.ini](../platformio.ini) pins pioarduino to `55.03.312-1`, LVGL to `v9.6.0`, and ArduinoJson to `7.4.3`. Use Python 3.10 or later. Initial builds need internet access to download dependencies.
+
+S3 uses its own `esp32s3-waveshare-43-release` environment, pinned pioarduino `54.03.20`, Arduino 3.2.0 and Espressif's matching high-performance SDK. It requires 8 MB OPI PSRAM and PSRAM XIP, uses native RGB/GT911/CH422G drivers and UART0 on GPIO44/43. Build it with `python -m platformio run -e esp32s3-waveshare-43-release`. Replace the environment in upload commands when working on S3, and use USB TO UART. Native tests run protocol/UI checks under both board profiles; hardware drivers still need a physical board test.
 
 ## Windows quick start
 
@@ -70,7 +72,8 @@ Use [tools/aim_host.example.json](../tools/aim_host.example.json) as the shareab
 
 | Setting | Meaning |
 | --- | --- |
-| `port` | `auto` connects only when exactly one Espressif port is found. With multiple boards, set an explicit port; the host logs the candidates and waits. |
+| `board` | `guition-p4` or `waveshare-s3-43`; empty until first-time setup. Older configurations without this field retain P4. |
+| `port` | `auto` connects only when exactly one candidate port for the selected board is found. With multiple boards, set an explicit port; the host logs the candidates and waits. |
 | `interval_s` | API interval from 15 to 240 seconds; default 240. Valid configuration edits are applied while running. |
 | `zai_provider` | Keep `zcode`. |
 | `zai_key` | Optional local coding-plan credential; empty in the example. Prefer environment variable `ZAI_API_KEY`, which takes precedence. |

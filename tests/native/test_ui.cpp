@@ -12,6 +12,7 @@
 #include "ui/backlight.h"
 #include "ui/idle_dim.h"
 #include "app_settings.h"
+#include "ui/visual_dimmer.h"
 
 static uint32_t fakeTick = 1000;
 static aim::Snapshot sample{};
@@ -710,6 +711,15 @@ int main(int argc, char** argv) {
   ui_nova_update(); CHECK(nova_ui::pageCount == 4);
   lv_obj_send_event(nova_ui::nextButton, LV_EVENT_CLICKED, nullptr);
   CHECK(nova_ui::page == 1 && nova_ui::providers[0].view == 2);
+  auto* dimmer = create_visual_dimmer();
+  apply_visual_dimmer(dimmer, 255);
+  CHECK(lv_obj_has_flag(dimmer, LV_OBJ_FLAG_HIDDEN));
+  apply_visual_dimmer(dimmer, 80);
+  CHECK(!lv_obj_has_flag(dimmer, LV_OBJ_FLAG_HIDDEN));
+  CHECK(lv_obj_get_style_bg_opa(dimmer, LV_PART_MAIN) == 175);
+  CHECK(!lv_obj_has_flag(dimmer, LV_OBJ_FLAG_CLICKABLE));
+  CHECK(lv_obj_get_parent(dimmer) == lv_layer_sys());
+  lv_obj_delete(dimmer);
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

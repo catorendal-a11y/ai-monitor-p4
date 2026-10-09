@@ -1,3 +1,5 @@
+#include "../config.h"
+#if !defined(AIM_BOARD_WAVESHARE_S3)
 // AI Monitor P4 - LVGL Hardware Abstraction Layer Implementation
 // LVGL 9.x with PSRAM buffers, MIPI-DSI DPI panel flush
 // Color format: RGB565 (matching ST7701S and JC4880P433C BSP)
@@ -190,3 +192,5 @@ void lvgl_hal_init() {
   LOG_I("LVGL tick timer started (1ms)");
   LOG_I("LVGL HAL init complete");
 }
+
+#endif

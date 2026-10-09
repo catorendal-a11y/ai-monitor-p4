@@ -6,7 +6,7 @@ The portable Windows archive lets users run the companion and flash the display 
 
 1. Push the reviewed, credential-free repository to your GitHub repository. Do not copy local configurations, logs or unrelated output files.
 2. Ensure Actions is enabled. Set `FW_VERSION` to the intended version and pass CI. Commit before tagging.
-3. Create and push a tag matching `FW_VERSION`, such as `v1.12.1`. This explicitly starts the Portable Windows release workflow.
+3. Create and push a tag matching `FW_VERSION`, such as `v1.13.0`. This explicitly starts the Portable Windows release workflow.
 4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables and creates a **draft release** containing the Windows ZIP and its SHA-256 checksum. Drafts are invisible to ordinary downloaders.
 5. Download the draft ZIP, extract it on Windows, test the menu, setup and firmware on the target board, and verify no private files are included. Review license notices and the corresponding upstream source.
 6. Publish the reviewed draft using GitHub's Releases UI. README's recommended download is available after publication.
@@ -23,9 +23,17 @@ Use Python 3.12 x64 and a clean checkout. Install host dependencies plus the pin
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -BuildTools
 .\.venv\Scripts\python.exe -m pip install -r scripts/requirements-release.txt
 .\.venv\Scripts\python.exe -m platformio run -e esp32p4-release
+.\.venv\Scripts\python.exe -m platformio run -e esp32s3-waveshare-43-release
 ```
 
-Copy the matching `fw_*.bin` and `fw_*.factory.bin` from that build into `work/prebuilt/application.bin` and `work/prebuilt/factory.bin`. Do not mix different builds. Then:
+Collect both board-specific matching pairs. Each build creates its own application and factory image:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/collect_firmware.py --environment esp32p4-release --output work/prebuilt
+.\.venv\Scripts\python.exe scripts/collect_firmware.py --environment esp32s3-waveshare-43-release --output work/prebuilt
+```
+
+The package requires both `work/prebuilt/guition-p4/` and `work/prebuilt/waveshare-s3-43/`. Its schema-2 manifest records board, chip, status, image offsets, sizes and hashes. The builder verifies image chip headers, current firmware version and factory/application consistency before archiving. Then:
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"

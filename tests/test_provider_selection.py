@@ -49,7 +49,7 @@ class SelectionTests(unittest.TestCase):
     def test_activity_only_provider_never_fetches_codex_or_zai_or_invents_quota(self):
         panel = Mock(); panel.retries = host.ProviderRetries(); panel.wait_for.return_value = {'type':'ack'}
         with patch.object(host, 'fetch_codex') as codex, patch.object(host, 'fetch_zcode') as zai:
-            host.poll_cycle(dict(host.DEFAULT_CONFIG, providers=['gemini']), '', ['gemini'], 100, panel)
+            host.poll_cycle(dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['gemini']), '', ['gemini'], 100, panel)
         codex.assert_not_called(); zai.assert_not_called()
         data = json.loads(panel.send_frame.call_args.args[0])['data'][0]
         self.assertTrue(data['informational']); self.assertNotIn('usage', data)
@@ -112,7 +112,7 @@ class SelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); home=root/'home'; settings=home/'.claude/settings.json'; settings.parent.mkdir(parents=True)
             settings.write_text(json.dumps({'statusLine':{'type':'command','command':'original'}}))
-            control.save_config(dict(host.DEFAULT_CONFIG,providers=['claude']),root)
+            control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4',providers=['claude']),root)
             before=settings.read_bytes()
             with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(control.SetupError):
                 control.integration_help(root,ask=lambda _: 'INSTALL',home=home)

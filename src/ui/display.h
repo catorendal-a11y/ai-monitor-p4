@@ -8,8 +8,10 @@
 #include "backlight.h"
 #include "../config.h"
 #include "esp_lcd_panel_ops.h"
+#if !defined(AIM_BOARD_WAVESHARE_S3)
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_st7701.h"
+#endif
 #include "esp_lcd_touch.h"
 #include "esp_lcd_touch_gt911.h"
 #include "driver/i2c_master.h"

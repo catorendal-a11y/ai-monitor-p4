@@ -70,7 +70,7 @@ class PanelTests(unittest.TestCase):
         self.assertIn(b'"cmd": "host_activity"', bytes(serial.written))
 
     def test_legacy_firmware_does_not_receive_activity_commands(self):
-        serial = FakeSerial([b'{"type":"info"}\n'])
+        serial = FakeSerial([b'{"type":"info","display":"jc4880p433","panelId":"esp32p4-mipi-dsi"}\n'])
         panel = panel_with(serial)
         panel.heartbeat()
         before = bytes(serial.written)
@@ -187,7 +187,7 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(serial.written, b"AIM1 2 3\n\xc3\xb8\n")
 
     def test_failed_handshake_closes_port(self):
-        serial = FakeSerial([b'{"type":"info"}\n'])
+        serial = FakeSerial([b'{"type":"info","display":"jc4880p433","panelId":"esp32p4-mipi-dsi"}\n'])
         with patch.object(host.serial, "Serial", return_value=serial), patch.object(host.time, "sleep"):
             with self.assertRaises(TimeoutError):
                 host.connect_panel("COM_TEST", ["codex"])
@@ -195,7 +195,7 @@ class PanelTests(unittest.TestCase):
 
     def test_handshake_configures_views_before_returning(self):
         serial = FakeSerial([
-            b'{"type": "info"}\n',
+            b'{"type":"info","display":"jc4880p433","panelId":"esp32p4-mipi-dsi"}\n',
             b'{"type":"ok","cmd":"set_views"}\n',
         ])
         with patch.object(host.serial, "Serial", return_value=serial), patch.object(host.time, "sleep"):
@@ -500,7 +500,7 @@ class ConfigReloadTests(unittest.TestCase):
 
     def test_new_configuration_changes_interval_and_view_set(self):
         panel, watcher = Mock(), Mock()
-        changed = dict(host.DEFAULT_CONFIG, providers=['codex', 'zcode'], interval_s=60, zai_key="test-key", port="COM_TEST")
+        changed = dict(host.DEFAULT_CONFIG, board='waveshare-s3-43', providers=['codex', 'zcode'], interval_s=60, zai_key="test-key", port="COM_TEST")
         watcher.take.side_effect = [changed]
         with patch.object(host, "ConfigWatcher", return_value=watcher), \
                 patch.object(host, "find_port", return_value="COM_TEST") as find, \
@@ -509,8 +509,8 @@ class ConfigReloadTests(unittest.TestCase):
                 patch.object(host, "wait_connected", side_effect=KeyboardInterrupt) as wait, patch.object(host, "LOG"):
             with self.assertRaises(KeyboardInterrupt):
                 host._run_loop(host.DEFAULT_CONFIG, 240, "", ["codex"])
-        find.assert_called_once_with("COM_TEST")
-        connect.assert_called_once_with("COM_TEST", ["codex", "zcode"])
+        find.assert_called_once_with("COM_TEST", 'waveshare-s3-43')
+        connect.assert_called_once_with("COM_TEST", ["codex", "zcode"], 'waveshare-s3-43')
         self.assertEqual(poll.call_args.args[:3], (changed, "test-key", ["codex", "zcode"]))
         self.assertLessEqual(wait.call_args.args[1], 60)
         panel.close.assert_called_once()

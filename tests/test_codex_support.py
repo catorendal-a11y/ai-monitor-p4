@@ -47,7 +47,7 @@ class CodexOnboardingTests(unittest.TestCase):
 
     def test_unselected_codex_is_not_prepared_and_existing_key_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory); control.save_config(dict(host.DEFAULT_CONFIG,providers=['gemini'],zai_key='fixture-key'),root)
+            root=Path(directory); control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4',providers=['gemini'],zai_key='fixture-key'),root)
             with patch.object(control,'setup_codex') as prepare, patch.object(control.list_ports,'comports',return_value=[]), \
                     contextlib.redirect_stdout(io.StringIO()):
                 control.configure(root,ask=lambda _: '',read_secret=lambda _: self.fail('Unselected key prompt'))

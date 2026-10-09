@@ -1,4 +1,5 @@
 {
+  "board": "",
   "providers": [],
   "port": "auto",
   "interval_s": 240,

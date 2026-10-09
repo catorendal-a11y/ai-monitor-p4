@@ -11,6 +11,9 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tools'))
+from board_profiles import BOARDS
+from aim_control import firmware_file
 
 
 def run(*arguments):
@@ -19,7 +22,7 @@ def run(*arguments):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--firmware-dir', type=Path, required=True, help='Directory containing application.bin and factory.bin')
+    parser.add_argument('--firmware-dir', type=Path, required=True, help='Directory containing both board-specific firmware folders')
     parser.add_argument('--output', type=Path, default=ROOT / 'work/windows-release')
     parser.add_argument('--executables-dir', type=Path, help='Reuse executables already built from the same reviewed source')
     args = parser.parse_args()
@@ -64,14 +67,24 @@ def main():
         shutil.copy2(ROOT / relative, target)
     firmware = package / 'firmware'
     firmware.mkdir()
-    manifest = {'version': version, 'board': 'GUITION JC4880P433', 'chip': 'esp32p4', 'files': {}}
-    for name in ('application.bin', 'factory.bin'):
-        image = args.firmware_dir / name
-        if not image.is_file():
-            raise RuntimeError('Required prebuilt firmware is missing')
-        shutil.copy2(image, firmware / name)
-        manifest['files'][name] = {'sha256': hashlib.sha256(image.read_bytes()).hexdigest(), 'bytes': image.stat().st_size}
+    manifest = {'schema': 2, 'version': version, 'boards': {}}
+    for board in BOARDS.values():
+        folder = firmware / board.id
+        folder.mkdir()
+        record = {'board':board.name, 'chip':board.chip, 'experimental':board.experimental, 'files':{}}
+        for name, offset in [('application.bin', 0x10000), ('factory.bin', 0)]:
+            image = args.firmware_dir / board.id / name
+            if not image.is_file(): raise RuntimeError('Required board-specific firmware is missing')
+            data = image.read_bytes()
+            if name == 'application.bin' and version.encode() not in data:
+                raise RuntimeError('Firmware version does not match source')
+            shutil.copy2(image, folder / name)
+            record['files'][name] = {'sha256':hashlib.sha256(data).hexdigest(), 'bytes':len(data), 'offset':offset}
+        manifest['boards'][board.id] = record
     (firmware / 'manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    for board in BOARDS.values():
+        firmware_file('install', package, board.id)
+        firmware_file('update', package, board.id)
     licenses = package / 'licenses'
     licenses.mkdir()
     for distribution in metadata.distributions():

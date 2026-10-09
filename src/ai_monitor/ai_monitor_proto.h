@@ -23,6 +23,7 @@
 #include <string>
 
 #include "ai_monitor.h"
+#include "../board_profile.h"
 
 namespace aim {
 
@@ -173,7 +174,7 @@ class ProtoCore {
   }
 
   void emitf(const char* fmt, ...) {
-    char buf[768];
+    char buf[1024];
     va_list args;
     va_start(args, fmt);
     const int length = vsnprintf(buf, sizeof(buf), fmt, args);
@@ -211,11 +212,14 @@ class ProtoCore {
 
   void reply_info() {
     emitf("{\"type\":\"info\",\"version\":\"%s\",\"firmwareVersion\":\"%s\",\"bootId\":%u,\"mac\":\"%s\","
-          "\"display\":\"jc4880p433\",\"panel\":\"ST7701S\",\"panelId\":\"esp32p4-mipi-dsi\","
+          "\"display\":\"%s\",\"panel\":\"%s\",\"panelId\":\"%s\",\"boardId\":\"%s\",\"chip\":\"%s\","
+          "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,"
           "\"uptime\":%lu,\"heap\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu}\n",
-          kReportedVersion, firmware_version, (unsigned)boot_id, mac_, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
+          kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
+          board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
+          board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
           (unsigned long)(tick() / 1000u), (unsigned)heap(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta));
     note_host_seen();

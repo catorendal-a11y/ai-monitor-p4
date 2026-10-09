@@ -1,9 +1,12 @@
-Security update v1.12.1 blocks authenticated API redirects, rejects current/project-folder Codex executables, validates USB serial paths, bounds local configuration reads and removes terminal control characters from logs. Actions are pinned and dependency security checks are enabled. Read docs/SECURITY_REVIEW.md for evidence and remaining limits.
+# AI Monitor v1.13.0
 
-Download **ai-monitor-p4-v1.12.1-windows.zip**. Extract the entire ZIP, open **AI-Monitor.exe** and follow First-time setup. Python, the host, the firmware flasher and prebuilt GUITION JC4880P433 firmware are included. Existing v1.12.0 display firmware remains compatible; the security changes are in the PC host, so it does not require flashing.
+Choose GUITION ESP32-P4 or the original Waveshare ESP32-S3-Touch-LCD-4.3 in the same portable Windows app. New users explicitly choose their board and AI providers. Both firmware builds share NOVA/ORBIT, four themes and the existing usage dashboard.
 
-On a new board, use Install firmware / First installation; on an existing AI Monitor P4 board, use the application update. First installation resets display settings. Select the correct USB data port. Start host afterward; it runs invisibly after the menu closes.
+- Separate S3 RGB/GT911/CH422G backend, memory-conscious buffers and matching PSRAM XIP SDK. P4 retains its existing MIPI DSI backend.
+- Board-aware UART/USB discovery, handshake validation and firmware selection. Chip headers, offsets, checksums and matching factory/application images are verified before flashing.
+- S3 visual brightness, idle fades and night schedule; the original board's LED backlight supports on/off only. Connect **USB TO UART** for flashing and host use.
+- CI builds both targets; synthetic host, protocol and native LVGL regressions cover board selection and dimming. No maintainer configuration, API credentials or local activity records are distributed.
 
-Codex quota requires a local Codex CLI login. ZCode quota optionally requires your own Z.AI coding-plan key. No personal credentials are included. Read the README and Quick Start before installing.
+**S3 is experimental and has not been tested on physical hardware.** Only the original CH422G Waveshare model is targeted; B/C variants are unsupported. Touch alignment, RGB stability, tearing and sustained operation need board testing. See [board guide](https://github.com/catorendal-a11y/ai-monitor-p4/blob/main/docs/BOARDS.md).
 
-The automatic Source code ZIP is for developers and does not contain the portable executables or firmware. The standalone Windows archive contains reviewed source, firmware hashes and dependency notices/source.
+Download the **ai-monitor-p4-v1.13.0-windows.zip** asset, extract everything, open **AI-Monitor.exe**, select your board in First-time setup and install its firmware. Existing P4 v1.12.0+ displays can keep their firmware; old private host configurations without a board field retain P4. Stop the old host before starting one from a new folder. Keep your own tools/aim_host.json private.

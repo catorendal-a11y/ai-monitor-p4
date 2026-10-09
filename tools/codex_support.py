@@ -112,7 +112,7 @@ def read_rate_limits(command, timeout=20):
             if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
             return message['result']
     try:
-        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.12.1'}}})
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.13.0'}}})
         response(1); send({'method':'initialized','params':{}})
         send({'method':'account/rateLimits/read','id':2})
         return response(2)

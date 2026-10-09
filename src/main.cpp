@@ -45,7 +45,7 @@ static void uiTask(void*) {
   for (;;) {
     aim::apply_pending_controls();
     const uint32_t now = millis();
-    if (now - lastUpdate >= 40) {
+    if (now - lastUpdate >= board_profile::ui_update_ms) {
       lastUpdate = now;
       idle_dim_update();  // every screen, independent of USB freshness
       ui_settings_update();
@@ -64,17 +64,22 @@ void setup() {
   // would silently truncate them. HWCDC only resizes while stopped.
   // Reserve space for the 4095-byte payload AND its AIM1 header/trailing newline.
   Serial.setRxBufferSize(8192);
+#if defined(AIM_BOARD_WAVESHARE_S3)
+  // The USB TO UART connector is used for both flashing and normal host data.
+  Serial.begin(115200, SERIAL_8N1, 44, 43);
+#else
   Serial.begin(115200);
+#endif
   delay(100);
 
   LOG_I("AI Monitor P4 %s", FW_VERSION);
-  LOG_I("Hardware: GUITION JC4880P433 ESP32-P4 (MIPI-DSI ST7701S + GT911)");
+  LOG_I("Hardware: %s", board_profile::name);
 
   display_init();
   lvgl_hal_init();
   aim::begin();  // initializes the control queue before the UI task starts
 
-  if (xTaskCreatePinnedToCore(uiTask, "ui", 65536, nullptr, 2, &uiHandle, 1) != pdPASS) {
+  if (xTaskCreatePinnedToCore(uiTask, "ui", board_profile::ui_stack_bytes, nullptr, 2, &uiHandle, 1) != pdPASS) {
     fatal_halt("ui task allocation failed");
   }
 

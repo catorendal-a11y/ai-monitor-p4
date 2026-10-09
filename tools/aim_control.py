@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ from provider_catalog import PROVIDERS, selected_providers
 import base64
 from codex_support import setup_codex, codex_command
 from host_security import read_local_json, safe_text, serial_port, powershell_executable
+from board_profiles import BOARDS, get_board, configured_board
 
 
 class SetupError(ValueError):
@@ -38,6 +40,7 @@ def local_config(root=ROOT):
     if not isinstance(config, dict):
         raise SetupError("Local configuration must be a JSON object.")
     output = dict(host.DEFAULT_CONFIG, **config)
+    output['board'] = configured_board(config)
     try: output['port'] = serial_port(output['port'])
     except ValueError: raise SetupError('Invalid local USB port; use auto, COM or a /dev/ serial device.') from None
     output['providers'] = selected_providers(config, legacy=True)
@@ -99,8 +102,28 @@ def choose_providers(current, ask=input):
         print('Select at least one provider explicitly; duplicates are not allowed.')
 
 
+def choose_board(current='', ask=input):
+    print('\nChoose your display board:')
+    choices = list(BOARDS)
+    for index, identifier in enumerate(choices, 1):
+        board = BOARDS[identifier]
+        print(f'  {index}. {board.name}' + (' (EXPERIMENTAL - not physically verified)' if board.experimental else ''))
+    if current:
+        print('Enter keeps: ' + get_board(current).name)
+    while True:
+        answer = ask('Board number: ').strip()
+        if not answer and current: return current
+        if answer.isdecimal() and 1 <= int(answer) <= len(choices): return choices[int(answer)-1]
+        print('Select a supported board explicitly.')
+
+
 def configure(root=ROOT, ask=input, read_secret=getpass.getpass):
     config = local_config(root)
+    config['board'] = choose_board(config.get('board', ''), ask)
+    board = get_board(config['board'])
+    if board.experimental:
+        print('S3: use the USB TO UART connector for flashing AND host data. Native USB is not this transport.')
+        print('Brightness is visual dimming; the physical backlight supports on/off. RGB/touch need hardware verification.')
     config['providers'] = choose_providers(config['providers'], ask)
     config["port"] = choose_port(config["port"], ask)
     if 'codex' in config['providers']:
@@ -165,6 +188,9 @@ def start_host(root=ROOT):
     config = host.load_config()
     if not config['providers']:
         raise SetupError('Choose your AI providers in First-time setup before starting the host.')
+    if not config.get('board'):
+        raise SetupError('Choose your display board in First-time setup before starting the host.')
+    get_board(config['board'])
     stop_host(root)
     if getattr(sys, "frozen", False):
         command = [sys.executable, "--host"]
@@ -184,53 +210,82 @@ def start_host(root=ROOT):
     print("Host started in the background. You may close this window.")
 
 
-def firmware_file(kind, root=ROOT):
+def firmware_file(kind, root=ROOT, board_id='guition-p4'):
+    if kind not in ('install', 'update'): raise SetupError('Unknown firmware operation.')
+    try: board = get_board(board_id)
+    except ValueError: raise SetupError('Choose your display board before flashing.') from None
     name = "factory.bin" if kind == "install" else "application.bin"
-    path = root / "firmware" / name
+    folder = root / 'firmware'
     manifest_path = root / "firmware/manifest.json"
-    if not path.is_file() or not manifest_path.is_file():
+    if not manifest_path.is_file():
         raise SetupError("Prebuilt firmware is missing. Download the Windows release package or see the developer guide.")
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        expected = manifest["files"][name]["sha256"]
-        if manifest["board"] != "GUITION JC4880P433" or manifest["chip"] != "esp32p4":
-            raise ValueError()
-        if not isinstance(expected, str) or not re.fullmatch(r"[a-f0-9]{64}", expected):
-            raise ValueError()
-    except (ValueError, KeyError, TypeError):
-        raise SetupError("Firmware manifest is invalid.") from None
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-        raise SetupError("Firmware checksum failed. Extract a fresh copy of the release package.")
+        manifest = read_local_json(manifest_path)
+        modern = manifest.get('schema') == 2
+        record = manifest['boards'][board.id] if modern else manifest
+        if modern: folder = folder / board.id
+        elif board.id != 'guition-p4': raise ValueError()
+        expected_name = board.name if modern else 'GUITION JC4880P433'
+        if record['board'] != expected_name or record['chip'] != board.chip: raise ValueError()
+        def checked_image(filename, offset):
+            file = folder / filename
+            if not file.resolve().is_relative_to((root / 'firmware').resolve()): raise ValueError()
+            item = record['files'][filename]
+            digest = item['sha256']
+            if not isinstance(digest, str) or not re.fullmatch(r'[a-f0-9]{64}', digest): raise ValueError()
+            if not 0 < file.stat().st_size <= 16 * 1024 * 1024: raise ValueError()
+            if modern and (type(item.get('bytes')) is not int or item['bytes'] != file.stat().st_size or
+                           type(item.get('offset')) is not int or item['offset'] != offset): raise ValueError()
+            data = file.read_bytes()
+            if hashlib.sha256(data).hexdigest() != digest: raise ValueError()
+            return file, data
+        path, data = checked_image(name, 0 if kind == 'install' else 0x10000)
+        if modern:
+            _, app = checked_image('application.bin', 0x10000)
+            def check_chip(image, offset=0):
+                header = image[offset:offset+24]
+                if len(header) != 24 or header[0] != 0xe9 or struct.unpack_from('<H',header,12)[0] != board.image_chip_id:
+                    raise ValueError()
+            check_chip(app)
+            if kind == 'install':
+                check_chip(data, board.bootloader_offset)
+                if data[0x10000:0x10000+len(app)] != app: raise ValueError()
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, struct.error):
+        raise SetupError('Firmware board/chip/layout or checksum verification failed. Extract a matching release package.') from None
     return path
 
 
-def flash_command(kind, port, root=ROOT):
-    path = firmware_file(kind, root)
+def flash_command(kind, port, root=ROOT, board_id='guition-p4'):
+    path = firmware_file(kind, root, board_id)
+    board = get_board(board_id)
     tool = root / "firmware-flasher.exe"
     command = [str(tool)] if tool.exists() else [sys.executable, "-m", "esptool"]
     if getattr(sys, "frozen", False) and not tool.exists():
         raise SetupError("Firmware flasher is missing. Extract the complete Windows package.")
-    return command + ["--chip", "esp32p4", "--port", port, "--baud", "115200", "write-flash",
+    return command + ["--chip", board.chip, "--port", serial_port(port), "--baud", "115200", "write-flash",
                       "0x0" if kind == "install" else "0x10000", str(path)]
 
 
 def flash(root=ROOT, ask=input):
-    print("\nOnly for the GUITION JC4880P433 ESP32-P4 board with ST7701S/GT911.")
+    config = local_config(root)
+    config['board'] = choose_board(config.get('board', ''), ask)
+    board = get_board(config['board'])
+    print('\nFirmware target: ' + board.name)
+    if board.experimental: print('EXPERIMENTAL S3: unverified on physical hardware. Use the USB TO UART port.')
     print("1. First installation (writes bootloader/partitions; resets display settings)")
-    print("2. Update an existing AI Monitor P4 installation (keeps its partition layout/settings)")
+    print("2. Update an existing AI Monitor installation on this board (keeps its partition layout/settings)")
     choice = ask("Choose 1 or 2; Enter cancels: ").strip()
     if choice not in {"1", "2"}:
         return
     kind = "install" if choice == "1" else "update"
-    config = local_config(root)
     port = choose_port(config["port"], ask)
     if port == "auto":
-        ports = list({p.device for p in list_ports.comports() if p.vid == 0x303A})
+        ports = list({p.device for p in list_ports.comports() if p.vid in board.usb_vids})
         if len(ports) != 1:
             raise SetupError("Select an explicit port before flashing; no unambiguous display was found.")
         port = ports[0]
-    command = flash_command(kind, port, root)
-    if ask(f"Write firmware to {port} on this GUITION board? Type FLASH to proceed: ").strip() != "FLASH":
+    command = flash_command(kind, port, root, board_id=board.id)
+    if ask(f"Write firmware to {port} on {board.name}? Type FLASH to proceed: ").strip() != "FLASH":
         print("Cancelled. Nothing was written.")
         return
     stop_host(root)
@@ -245,6 +300,8 @@ def flash(root=ROOT, ask=input):
 def status(root=ROOT):
     config = local_config(root)
     providers = config['providers']
+    identifier = config.get('board', '')
+    print('Board: ' + (get_board(identifier).name if identifier else 'not selected - open First-time setup'))
     print(f"Host: {'running' if owned_hosts(root) else 'stopped'} / USB port: {config['port']}")
     print('Selected providers: ' + (', '.join(PROVIDERS[key][0] for key in providers) or 'none - open First-time setup'))
     if 'codex' in providers:
@@ -333,7 +390,7 @@ def main(argv=None):
         return 0
     actions = {"1": configure, "2": start_host, "3": stop_host, "4": flash, "5": status, "6": view_log, '7': integration_help}
     while True:
-        print("\nAI MONITOR P4\n1. First-time setup / choose AI providers\n2. Start host (hidden)\n3. Stop host\n4. Install / update display firmware\n5. Status / connection help\n6. View recent log\n7. Provider integration help\n0. Exit")
+        print("\nAI MONITOR\n1. First-time setup / choose board and AI providers\n2. Start host (hidden)\n3. Stop host\n4. Install / update display firmware\n5. Status / connection help\n6. View recent log\n7. Provider integration help\n0. Exit")
         try:
             choice = input("Choose: ").strip()
             if choice == "0":

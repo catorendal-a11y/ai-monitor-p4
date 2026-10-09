@@ -21,7 +21,7 @@ class SetupTests(unittest.TestCase):
             root = Path(directory)
             child = Mock(); child.poll.return_value = None
             with patch.object(control.sys, 'frozen', True, create=True), \
-                    patch.object(control.host, 'load_config', return_value={'providers': ['codex']}), patch.object(control, 'stop_host'), \
+                    patch.object(control.host, 'load_config', return_value={'providers': ['codex'], 'board':'guition-p4'}), patch.object(control, 'stop_host'), \
                     patch.object(control.subprocess, 'Popen', return_value=child) as spawn, \
                     patch.object(control.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
                 control.start_host(root)
@@ -45,7 +45,7 @@ class SetupTests(unittest.TestCase):
     def test_invalid_key_cannot_replace_valid_local_config(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            control.save_config(dict(control.host.DEFAULT_CONFIG, providers=['zcode']), root)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, board='guition-p4', providers=['zcode']), root)
             before = (root / 'tools/aim_host.json').read_bytes()
             with contextlib.redirect_stdout(io.StringIO()), patch.object(control.list_ports, 'comports', return_value=[]):
                 with self.assertRaises(ValueError):
@@ -93,7 +93,7 @@ class SetupTests(unittest.TestCase):
     def test_cancelled_flash_never_stops_host_or_invokes_tool(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            replies = iter(['1', 'COM6', 'NO'])
+            replies = iter(['1', '1', 'COM6', 'NO'])
             with contextlib.redirect_stdout(io.StringIO()), patch.object(control, 'flash_command', return_value=['flasher']), \
                     patch.object(control, 'stop_host') as stop, patch.object(control.subprocess, 'run') as run, \
                     patch.object(control.list_ports, 'comports', return_value=[]):
@@ -103,7 +103,7 @@ class SetupTests(unittest.TestCase):
     def test_status_is_local_and_does_not_show_keys_or_make_api_calls(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            control.save_config(dict(control.host.DEFAULT_CONFIG, zai_key='fixture-status-key'), root)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, board='guition-p4', zai_key='fixture-status-key'), root)
             output = io.StringIO()
             with contextlib.redirect_stdout(output), patch.object(control, 'owned_hosts', return_value=[]), \
                     patch.object(control.list_ports, 'comports', return_value=[]), \

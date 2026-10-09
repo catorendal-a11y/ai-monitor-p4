@@ -1,3 +1,5 @@
+#include "../config.h"
+#if !defined(AIM_BOARD_WAVESHARE_S3)
 // AI Monitor P4 - Display Implementation
 // ESP32-P4: ST7701S 480x800 MIPI-DSI, GUITION JC4880P433
 // Board-specific ST7701S initialization and backlight control.
@@ -353,3 +355,5 @@ void display_init() {
 
   LOG_I("Display init complete: %dx%d", DISPLAY_H_RES, DISPLAY_V_RES);
 }
+
+#endif

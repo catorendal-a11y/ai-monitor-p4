@@ -1,4 +1,4 @@
-# AI Monitor P4 — ESP32-P4 AI Desk Companion
+# AI Monitor — ESP32-P4 and ESP32-S3 AI Desk Companion
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
@@ -9,9 +9,9 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 
 **[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/q-a)
 
-**Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to the ESP32-P4 over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
+**Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
-**Two animated robots · Four color themes · No AI preselected · Portable Windows setup**
+**Two board choices · Two animated robots · Four color themes · No AI preselected · Portable Windows setup**
 
 ## Meet your desk companion
 
@@ -23,7 +23,16 @@ These previews are rendered from the actual LVGL interface using synthetic data.
 
 ## What you need
 
-- **GUITION JC4880P433 ESP32-P4** board with the 4.3-inch ST7701S display and GT911 touch controller. The supplied firmware is for this board.
+Choose one of the two firmware targets:
+
+| Display board | Status | USB connector |
+| --- | --- | --- |
+| **GUITION JC4880P433 ESP32-P4** | Supported | Espressif USB data port |
+| **Original Waveshare ESP32-S3-Touch-LCD-4.3** | **Experimental; not yet tested on physical S3 hardware** | **USB TO UART**, for flashing and daily use |
+
+The S3 target is the original CH422G model, **not B or C**. [Board compatibility, brightness differences and setup](docs/BOARDS.md).
+
+- Your selected board from the table above.
 - A **USB data cable** connected to the board's USB data port.
 - A **Windows 10/11 x64 PC** for the ready-to-run package, plus your own AI account or local CLI installation.
 
@@ -31,15 +40,15 @@ The Windows package includes the Python runtime, PC companion, firmware flasher 
 
 ## Get running on Windows
 
-1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest) and download **ai-monitor-p4-v1.12.1-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
+1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest) and download **ai-monitor-p4-v1.13.0-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
-3. **Choose your AI tools.** Select **1 - First-time setup**, choose one or more providers, then select the display's USB port. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
+3. **Choose your board and AI tools.** Select **1 - First-time setup**, choose P4 or S3, then choose one or more providers, then select the display's USB port. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, choose **4 - Install / update display firmware**, then **1 - First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
 5. **Start the companion.** Select **2 - Start host**. Close the menu; the host keeps running invisibly while the display remains connected.
 
-**Already on display firmware v1.12.0 or later?** Skip flashing. The v1.12.1 security fixes are in the PC host and work with existing v1.12.0 display firmware.
+**Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity; flashing is optional for P4. A new S3 board requires its own first installation.
 
-**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.12.1/ai-monitor-p4-v1.12.1-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.12.1/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
+**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.13.0/ai-monitor-p4-v1.13.0-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.13.0/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
 
 GitHub's **Source code (zip)** download contains source only; it does not include the portable programs or prebuilt firmware.
 
@@ -76,16 +85,16 @@ On the display, open **SET > APPEARANCE**. Choose **NOVA** or **ORBIT**, then **
 
 [View the provider details screen](docs/ui/details-ocean.png).
 
-The display also includes reset countdowns, manual refresh, low/critical quota warnings, session history, brightness presets, gradual idle dimming and scheduled night brightness.
+The display also includes reset countdowns, manual refresh, low/critical quota warnings, session history, brightness presets, gradual idle dimming and scheduled night brightness. P4 dims its LED backlight with PWM; S3 dims the rendered image and switches LEDs off only at zero. See [board differences](docs/BOARDS.md#brightness-and-performance).
 
 ## Everyday use
 
 | Menu choice | What it does |
 | --- | --- |
-| **1 - First-time setup** | Select providers, USB port and optional provider configuration. |
+| **1 - First-time setup** | Select display board, providers, USB port and optional provider configuration. |
 | **2 - Start host** | Start this folder's companion in the background. |
 | **3 - Stop host** | Stop hosts belonging to this folder. |
-| **4 - Install / update firmware** | Verify the firmware hash and ask for confirmation before flashing. |
+| **4 - Install / update firmware** | Verify the selected board, chip and firmware hashes before confirming a flash. |
 | **5 - Status** | Inspect host status, USB ports and readable token sources without making API calls. |
 | **6 - View recent log** | Show recent connection and polling messages. |
 | **7 - Provider integration help** | Retry Codex setup or configure the optional Claude quota bridge. |

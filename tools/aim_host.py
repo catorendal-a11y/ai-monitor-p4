@@ -27,6 +27,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter
 from provider_catalog import selected_providers, PROVIDERS
+from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
 from host_security import open_provider_request, read_local_json, safe_text, serial_port
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
@@ -108,6 +109,7 @@ def LOG(msg):
         pass
 
 DEFAULT_CONFIG = {
+    "board": "",          # First-time setup requires an explicit hardware choice.
     "providers": [],      # First-time setup requires an explicit selection.
     "port": "auto",       # "auto" = detect Espressif USB CDC, or e.g. "COM6"
     # 240 s: usage endpoints are free status endpoints (no model quota
@@ -173,6 +175,7 @@ def load_config():
     out = dict(DEFAULT_CONFIG)
     out.update(cfg)
     out["providers"] = selected_providers(cfg, legacy=CONFIG_PATH.exists())
+    out["board"] = configured_board(cfg, legacy=CONFIG_PATH.exists())
     out["port"] = serial_port(out["port"])
     if not isinstance(out["interval_s"], int) or isinstance(out["interval_s"], bool):
         raise ValueError("interval_s must be an integer")
@@ -427,13 +430,14 @@ def fetch_zcode(api_key):
 # ───────────────────────────────────────────────────────────────────────────────
 # PANEL LINK (esp32-ai-monitor protocol)
 # ───────────────────────────────────────────────────────────────────────────────
-def find_port(preferred):
+def find_port(preferred, board_id='guition-p4'):
     if preferred and preferred != "auto":
         return preferred
     try:
-        ports = sorted({port.device for port in list_ports.comports() if port.vid == 0x303A})
+        board = get_board(board_id)
+        ports = sorted({port.device for port in list_ports.comports() if port.vid in board.usb_vids})
         if len(ports) > 1:
-            LOG("Multiple Espressif ports found; set an explicit port in tools/aim_host.json: " + ", ".join(ports))
+            LOG("Multiple candidate ports found; choose an explicit port: " + ", ".join(ports))
             return None
         return ports[0] if ports else None
     except Exception as e:
@@ -458,6 +462,8 @@ class Panel:
         self.tokens_supported = False
         self.provider_selection_supported = False
         self.token_reporter = None
+        self.info = {}
+        self.expected_board = None
 
     def close(self):
         self.ser.close()
@@ -505,6 +511,9 @@ class Panel:
         fields = dict(clock_fields(), cmd="get_info", heartbeat=True, manualRefresh=True)
         self.send_line(json.dumps(fields))
         info = self.wait_for("info")
+        if self.expected_board is not None and not matches_info(self.expected_board, info):
+            raise RuntimeError('Connected display does not match the selected board. Open First-time setup.')
+        self.info = info
         self.activity_supported = info.get("hostActivity") is True
         self.tokens_supported = info.get("tokenActivity") is True
         self.provider_selection_supported = info.get('providerSelection') is True
@@ -566,9 +575,10 @@ class Panel:
         raise TimeoutError(f"{self.name}: no {message_type} reply")
 
 
-def connect_panel(port_name, views):
+def connect_panel(port_name, views, board_id='guition-p4'):
     panel = Panel(port_name)
     try:
+        panel.expected_board = get_board(board_id)
         time.sleep(0.5)
         panel.heartbeat()
         if any(provider not in ('codex', 'zcode') for provider in views) and not panel.provider_selection_supported:
@@ -709,6 +719,7 @@ def run(cfg):
     views = selected_providers(cfg)
     if not views:
         raise ValueError('No providers selected. Open First-time setup.')
+    get_board(cfg.get('board', 'guition-p4'))
 
     try:
         _run_loop(cfg, interval, zai_key, views)
@@ -741,19 +752,19 @@ def _run_loop(cfg, interval, zai_key, views):
                 retries.interval = interval
                 if previous.get("zai_key") != zai_key:
                     retries.succeeded("zcode")
-                if cfg["port"] != previous["port"] or changed_views != views:
+                if cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views:
                     if panel is not None: panel.close()
                     panel = None
                 views = changed_views
                 LOG("Validated configuration changes applied")
             if panel is None:
-                port_name = find_port(cfg["port"])
+                port_name = find_port(cfg["port"], cfg.get('board', 'guition-p4'))
                 if not port_name:
-                    LOG("no Espressif serial port found, retrying in 30 s")
+                    LOG("No candidate serial port found; retrying in 30 s")
                     time.sleep(30)
                     continue
                 try:
-                    panel = connect_panel(port_name, views)
+                    panel = connect_panel(port_name, views, cfg.get('board', 'guition-p4'))
                     panel.retries = retries
                     panel.fetcher = fetcher
                     panel.config_watcher = watcher
@@ -868,6 +879,9 @@ def main():
             return 1
         if not cfg['providers']:
             LOG('Choose AI providers in First-time setup before starting the host.')
+            return 1
+        if not cfg['board']:
+            LOG('Choose a display board in First-time setup before starting the host.')
             return 1
         run(cfg)
     finally:
