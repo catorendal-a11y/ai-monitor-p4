@@ -25,6 +25,8 @@ if (-not (Test-Path -LiteralPath $taskVenvPython)) {
     & $taskSelectedPython -m venv $taskVenv
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the local virtual environment.' }
 }
+& $taskVenvPython -m pip install --upgrade 'pip==26.2.1'
+if ($LASTEXITCODE -ne 0) { throw 'Package installer security update failed.' }
 & $taskVenvPython -m pip install -r (Join-Path $taskProjectRoot 'tools\requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 if ($BuildTools) {

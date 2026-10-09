@@ -28,6 +28,7 @@ from pathlib import Path
 from token_activity import TokenReporter
 from provider_catalog import selected_providers, PROVIDERS
 from codex_support import codex_command, codex_home, read_rate_limits
+from host_security import open_provider_request, read_local_json, safe_text, serial_port
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
 import serial
@@ -95,7 +96,7 @@ LOG_PATH = HERE / "aim_host.log"
 
 
 def LOG(msg):
-    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    line = f"[{time.strftime('%H:%M:%S')}] {safe_text(msg)}"
     if sys.stdout is not None:
         print(line, flush=True)
     try:
@@ -162,7 +163,7 @@ def release_lock():
 def load_config():
     if CONFIG_PATH.exists():
         try:
-            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
+            cfg = read_local_json(CONFIG_PATH)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid JSON in {CONFIG_PATH.name}: line {exc.lineno}") from exc
     else:
@@ -172,9 +173,7 @@ def load_config():
     out = dict(DEFAULT_CONFIG)
     out.update(cfg)
     out["providers"] = selected_providers(cfg, legacy=CONFIG_PATH.exists())
-    if not isinstance(out["port"], str) or not out["port"].strip():
-        raise ValueError("port must be 'auto' or a serial port name")
-    out["port"] = out["port"].strip()
+    out["port"] = serial_port(out["port"])
     if not isinstance(out["interval_s"], int) or isinstance(out["interval_s"], bool):
         raise ValueError("interval_s must be an integer")
     if not 15 <= out["interval_s"] <= 240:
@@ -303,7 +302,6 @@ def reset_seconds(value, epoch_now=None):
 # ───────────────────────────────────────────────────────────────────────────────
 # PROVIDER FETCHES - each returns (rows, notice) or None on failure
 # ───────────────────────────────────────────────────────────────────────────────
-_ctx = ssl.create_default_context()
 
 
 def fetch_codex():
@@ -344,7 +342,7 @@ def fetch_codex():
         req = urllib.request.Request("https://chatgpt.com/backend-api/wham/usage")
         req.add_header("Authorization", "Bearer " + access)
         req.add_header("User-Agent", "codex_cli_rs/0.159.3")
-        with urllib.request.urlopen(req, timeout=20, context=_ctx) as r:
+        with open_provider_request(req) as r:
             data = read_json_response(r)
         rl = data.get("rate_limit") or {}
         rows = []
@@ -381,7 +379,7 @@ def fetch_zcode(api_key):
         req = urllib.request.Request("https://api.z.ai/api/monitor/usage/quota/limit")
         req.add_header("Authorization", api_key.strip())
         req.add_header("Accept-Language", "en-US,en")
-        with urllib.request.urlopen(req, timeout=20, context=_ctx) as r:
+        with open_provider_request(req) as r:
             data = read_json_response(r)
         success, code = data.get("success"), data.get("code")
         if success is not None and type(success) is not bool:
@@ -555,7 +553,7 @@ class Panel:
                 if message.get("type") == "error":
                     if frame_id is None and "frameId" in message:
                         continue
-                    raise RuntimeError(message.get("message", "Panel rejected request"))
+                    raise RuntimeError("Panel rejected request")
                 if command is not None and message.get("cmd") != command:
                     continue
                 if message.get("type") == message_type:

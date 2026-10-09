@@ -3,11 +3,11 @@ import json
 import os
 from pathlib import Path
 import queue
-import shutil
 import subprocess
 import threading
 import time
 import psutil
+from host_security import allowed_executable, path_executable, powershell_executable
 
 MAX_REPLY_BYTES = 65536
 
@@ -17,7 +17,7 @@ def codex_home():
 
 
 def codex_command():
-    candidates = [shutil.which('codex.exe'), shutil.which('codex')]
+    candidates = [path_executable('codex.exe'), path_executable('codex')]
     install = os.environ.get('CODEX_INSTALL_DIR')
     if install: candidates += [str(Path(install) / ('codex.exe' if os.name == 'nt' else 'codex'))]
     if os.name == 'nt':
@@ -25,11 +25,11 @@ def codex_command():
     else:
         candidates += [str(Path.home() / '.local/bin/codex')]
     for candidate in candidates:
-        if not candidate or not Path(candidate).is_file(): continue
+        if not candidate or not allowed_executable(candidate): continue
         path = Path(candidate)
         if path.suffix.lower() in ('.cmd','.bat'):
             script = path.parent / 'node_modules/@openai/codex/bin/codex.js'
-            node = shutil.which('node.exe') or shutil.which('node')
+            node = path_executable('node.exe') or path_executable('node')
             if node and script.is_file(): return [node, str(script)]
             continue
         return [str(path)]
@@ -38,9 +38,12 @@ def codex_command():
 
 def install_command():
     if os.name == 'nt':
-        return ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-Command',
+        return [powershell_executable(),'-NoProfile','-ExecutionPolicy','Bypass','-Command',
                 'irm https://chatgpt.com/codex/install.ps1 | iex']
-    return ['sh','-c','curl -fsSL https://chatgpt.com/codex/install.sh | sh']
+    import shlex
+    shell, curl = path_executable('sh'), path_executable('curl')
+    if not shell or not curl: raise RuntimeError('Official installation requires an installed shell and curl.')
+    return [shell,'-c',shlex.quote(curl) + " --proto '=https' --proto-redir '=https' -fsSL https://chatgpt.com/codex/install.sh | " + shlex.quote(shell)]
 
 
 def setup_codex(ask=input):
@@ -109,7 +112,7 @@ def read_rate_limits(command, timeout=20):
             if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
             return message['result']
     try:
-        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.12.0'}}})
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.12.1'}}})
         response(1); send({'method':'initialized','params':{}})
         send({'method':'account/rateLimits/read','id':2})
         return response(2)

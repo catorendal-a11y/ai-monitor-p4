@@ -17,6 +17,7 @@ import aim_host as host
 from provider_catalog import PROVIDERS, selected_providers
 import base64
 from codex_support import setup_codex, codex_command
+from host_security import read_local_json, safe_text, serial_port, powershell_executable
 
 
 class SetupError(ValueError):
@@ -31,12 +32,14 @@ def local_config(root=ROOT):
     if not path.exists():
         return dict(host.DEFAULT_CONFIG)
     try:
-        config = json.loads(path.read_text(encoding="utf-8-sig"))
+        config = read_local_json(path)
     except (ValueError, OSError):
         raise SetupError("Local configuration is unreadable. Repair tools/aim_host.json before setup.") from None
     if not isinstance(config, dict):
         raise SetupError("Local configuration must be a JSON object.")
     output = dict(host.DEFAULT_CONFIG, **config)
+    try: output['port'] = serial_port(output['port'])
+    except ValueError: raise SetupError('Invalid local USB port; use auto, COM or a /dev/ serial device.') from None
     output['providers'] = selected_providers(config, legacy=True)
     return output
 
@@ -60,7 +63,7 @@ def choose_port(current="auto", ask=input):
     ports = sorted(list_ports.comports(), key=lambda port: port.device)
     print("\nConnect the display using its USB data port.")
     for index, port in enumerate(ports, 1):
-        print(f"  {index}. {port.device} - {port.description}")
+        print(f"  {index}. {safe_text(port.device)} - {safe_text(port.description)}")
     if not ports:
         print("No serial ports found. Check the cable; you can configure again later.")
     print(f"Enter a listed number, a port name, or auto. Enter keeps {current}.")
@@ -72,8 +75,9 @@ def choose_port(current="auto", ask=input):
             index = int(answer) - 1
             if 0 <= index < len(ports):
                 return ports[index].device
-        elif answer == "auto" or re.fullmatch(r"COM[1-9][0-9]*|/dev/[A-Za-z0-9._/-]+", answer, re.I):
-            return answer
+        else:
+            try: return serial_port(answer)
+            except ValueError: pass
         print("Choose a listed number, COM port, /dev/... port or auto.")
 
 
@@ -263,7 +267,7 @@ def view_log(root=ROOT):
     with path.open("rb") as log:
         log.seek(max(0, path.stat().st_size - 8192))
         lines = log.read().decode("utf-8", errors="replace").splitlines()
-    print("\n".join(lines[-25:]))
+    print("\n".join(safe_text(line) for line in lines[-25:]))
 
 
 def integration_help(root=ROOT, ask=input, home=None):
@@ -289,7 +293,7 @@ def integration_help(root=ROOT, ask=input, home=None):
     if os.name == 'nt':
         expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + argument.replace("'", "''") + "'" for argument in command)
         encoded = base64.b64encode(expression.encode('utf-16le')).decode('ascii')
-        shell_command = 'powershell.exe -NoProfile -EncodedCommand ' + encoded
+        shell_command = '"' + powershell_executable() + '" -NoProfile -EncodedCommand ' + encoded
     else:
         import shlex
         shell_command = shlex.join(command)

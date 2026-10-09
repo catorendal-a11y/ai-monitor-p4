@@ -2,7 +2,7 @@
 
 NOVA is a touchscreen desk companion that shows AI usage limits and reacts to registered token activity from the AI providers you select.
 
-**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.12.0. UI, setup and documentation are in English.
+**Hardware:** GUITION JC4880P433 ESP32-P4, 4.3-inch ST7701S/GT911 display. **Firmware:** v1.12.1. UI, setup and documentation are in English.
 
 ## UI preview
 
@@ -24,7 +24,7 @@ These images are rendered from the actual LVGL interface with synthetic test dat
 
 ## Start here
 
-**Windows 10/11 x64:** download **ai-monitor-p4-v1.12.0-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
+**Windows 10/11 x64:** download **ai-monitor-p4-v1.12.1-windows.zip** from this repository's **Releases**, extract the whole ZIP and double-click **AI-Monitor.exe**. Python and the firmware flasher are included. No development tools are needed.
 
 1. Connect the screen with a USB data cable.
 2. Choose **1 - First-time setup**, explicitly select your AI providers, then select the USB port.
@@ -32,6 +32,8 @@ These images are rendered from the actual LVGL interface with synthetic test dat
 4. Choose **2 - Start host** and close the menu. The companion keeps running invisibly.
 
 [Step-by-step guide and troubleshooting](docs/QUICK_START.md)
+
+**Security update v1.12.1:** update the PC host to get the security fixes. Existing v1.12.0 display firmware remains compatible and does not need reflashing. See the [security review](docs/SECURITY_REVIEW.md).
 
 **Source ZIP / clone:** Python 3.10+ is required. On Windows, double-click **AI-Monitor.bat**; first launch sets up the local environment and opens the menu. Source ZIPs do not contain prebuilt firmware or executables. Linux/macOS: run `sh setup.sh`, then `.venv/bin/python tools/aim_control.py`. See the [developer guide](docs/DEVELOPMENT.md) for firmware builds.
 

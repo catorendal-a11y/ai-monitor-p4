@@ -76,14 +76,14 @@ class CodexOnboardingTests(unittest.TestCase):
     def test_custom_install_directory_is_discovered_without_shell_interpolation(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); binary=root/('codex.exe' if os.name=='nt' else 'codex'); binary.touch()
-            with patch.dict(os.environ,{'CODEX_INSTALL_DIR':directory}), patch.object(support.shutil,'which',return_value=None):
+            with patch.dict(os.environ,{'CODEX_INSTALL_DIR':directory}), patch.object(support,'path_executable',return_value=None):
                 self.assertEqual(support.codex_command(),[str(binary)])
 
     def test_npm_wrapper_is_resolved_to_node_and_known_script_not_a_shell_command(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); shim=root/'codex.cmd';shim.touch()
             script=root/'node_modules/@openai/codex/bin/codex.js';script.parent.mkdir(parents=True);script.touch()
-            with patch.object(support.shutil,'which',side_effect=lambda name: str(shim) if name=='codex' else 'node-fixture' if name=='node' else None):
+            with patch.object(support,'path_executable',side_effect=lambda name: str(shim) if name=='codex' else 'node-fixture' if name=='node' else None):
                 self.assertEqual(support.codex_command(),['node-fixture',str(script)])
 
     def test_error_reply_stops_the_owned_child_tree_and_does_not_return_server_details(self):

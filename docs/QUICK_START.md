@@ -4,7 +4,7 @@
 
 Use Windows 10/11 x64, the **GUITION JC4880P433 ESP32-P4** display and a USB data cable. No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** on this repository and download **ai-monitor-p4-v1.12.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
+1. Open **Releases** on this repository and download **ai-monitor-p4-v1.12.1-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
 2. Right-click the ZIP and choose **Extract All**. Keep the entire folder together in a writable location, such as Documents. Do not run it inside the ZIP.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
 4. Choose **1 â€” First-time setup**. Explicitly select the AI providers you use; none are preselected. Then select the display's USB port. The optional Z.AI key is requested only if you choose ZCode. See [provider-specific setup](PROVIDERS.md) for Claude and other choices. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.

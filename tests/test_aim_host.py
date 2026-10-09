@@ -168,7 +168,7 @@ class PanelTests(unittest.TestCase):
             b'{"type":"ack","frameId":10}\n'
             b'{"type":"error","frameId":11,"message":"bad frame"}\n'
         ])
-        with self.assertRaisesRegex(RuntimeError, "bad frame"):
+        with self.assertRaisesRegex(RuntimeError, "Panel rejected request"):
             panel_with(serial).wait_for("ack", frame_id=11)
 
     def test_silent_device_times_out(self):
@@ -552,7 +552,7 @@ class ProviderTests(unittest.TestCase):
     def test_explicit_rejection_does_not_accept_success_code(self):
         context = self.response({"success": False, "code": 200, "data": {"limits": [
             {"type": "CREDIT_LIMIT", "unit": 3, "percentage": 25}]}})
-        with patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertTrue(notice)
@@ -562,7 +562,7 @@ class ProviderTests(unittest.TestCase):
             "secondary_window": {"used_percent": 25, "limit_window_seconds": 86400}}})
         auth = Mock()
         auth.read_text.return_value = '{"tokens":{"access_token":"test-token"}}'
-        with patch.object(host, "CODEX_AUTH", auth), patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "CODEX_AUTH", auth), patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_codex()
         self.assertIsNone(notice)
         self.assertEqual(rows[0]["windowMinutes"], 0)
@@ -570,7 +570,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(rows[1]["title"], "Secondary")
 
     def test_invalid_key_never_reaches_network(self):
-        with patch.object(host.urllib.request, "urlopen") as request:
+        with patch.object(host, "open_provider_request") as request:
             rows, notice = host.fetch_zcode("private-key\nInjected: header")
         request.assert_not_called()
         self.assertIsNone(rows)
@@ -585,7 +585,7 @@ class ProviderTests(unittest.TestCase):
         return context
 
     def test_exception_messages_do_not_expose_credentials(self):
-        with patch.object(host.urllib.request, "urlopen", side_effect=ValueError("Invalid header: private-key")):
+        with patch.object(host, "open_provider_request", side_effect=ValueError("Invalid header: private-key")):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
@@ -593,7 +593,7 @@ class ProviderTests(unittest.TestCase):
     def test_unknown_window_is_not_falsely_labelled_as_five_hours(self):
         context = self.response({"success": True, "data": {"limits": [
             {"type": "CREDIT_LIMIT", "unit": 99, "percentage": 25}]}})
-        with patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(notice)
         self.assertEqual(rows[0]["title"], "Quota")
@@ -614,7 +614,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_rejection_message_from_server_is_not_forwarded_verbatim(self):
         context = self.response({"success": False, "code": 401, "msg": "private-key"})
-        with patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
@@ -632,7 +632,7 @@ class ProviderTests(unittest.TestCase):
         context.__exit__ = Mock(return_value=False)
         auth = Mock()
         auth.read_text.return_value = '{"tokens":{"access_token":"test-token"}}'
-        with patch.object(host, "CODEX_AUTH", auth), patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "CODEX_AUTH", auth), patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_codex()
         self.assertIsNone(rows)
         self.assertTrue(notice)
@@ -644,7 +644,7 @@ class ProviderTests(unittest.TestCase):
         context = Mock()
         context.__enter__ = Mock(return_value=response)
         context.__exit__ = Mock(return_value=False)
-        with patch.object(host.urllib.request, "urlopen", return_value=context):
+        with patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertTrue(notice)
