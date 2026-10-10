@@ -185,6 +185,47 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertIn('COM4', self.window.usb_help.text())
         self.assertIn('explicitly', self.window.usb_help.text())
 
+    def test_guided_setup_routes_missing_choices_and_blocks_start_until_saved(self):
+        self.assertFalse(self.window.start_button.isEnabled())
+        self.window.port.setCurrentText('COM9999')
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.continue_setup()
+        self.assertEqual(self.window.tabs.currentIndex(),1)
+        self.window.providers['gemini'].setChecked(True)
+        self.assertFalse(self.window.start_button.isEnabled())
+        self.window.continue_setup()
+        self.assertFalse(self.window.unsaved); self.assertTrue(self.window.start_button.isEnabled())
+        self.assertIn('saved',self.window.setup_progress.text())
+
+    def test_ambiguous_usb_is_shown_before_starting_or_flashing(self):
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['gemini'].setChecked(True); self.window.save()
+        with patch.object(control.list_ports,'comports',return_value=[
+                Mock(device='COM4',description='Other ESP32',vid=0x303a),
+                Mock(device='COM6',description='Display',vid=0x303a)]):
+            self.window.rescan()
+        self.assertFalse(self.window.start_button.isEnabled())
+        self.assertIn('USB port',self.window.setup_next.text())
+        self.window.port.setCurrentText('COM6'); self.window.save()
+        self.assertTrue(self.window.start_button.isEnabled())
+
+    def test_failed_identity_check_guides_to_firmware_without_writing(self):
+        self.window.port.setCurrentText('COM9999')
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['gemini'].setChecked(True); self.window.save()
+        self.window.current_action='Checking USB identity'
+        with patch.object(QMessageBox,'warning'),patch.object(desktop,'write_firmware') as write, \
+                patch.object(self.window,'refresh_status'):
+            self.window._finished(False,'Display did not respond')
+            self.window.continue_setup()
+        self.assertEqual(self.window.tabs.currentIndex(),3); write.assert_not_called()
+
+    def test_automatic_start_reuses_existing_host_without_restart(self):
+        with patch.object(control,'owned_hosts',return_value=[Mock()]), \
+                patch.object(self.window,'start') as start:
+            self.window._auto_start_if_needed()
+        start.assert_not_called()
+
     def test_claude_link_controls_require_saved_selection_and_confirmation(self):
         self.assertTrue(self.window.claude_link_button.isHidden())
         self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))

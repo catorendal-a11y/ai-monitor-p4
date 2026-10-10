@@ -4,8 +4,8 @@
 
 Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** and download **AI-Monitor-Setup-v1.17.2-windows.exe**. It installs the complete app for your user and opens setup. No administrator access or separate Python installation is required. The release is unsigned; [read the Windows trust notes](WINDOWS_TRUST.md) if SmartScreen warns.
-2. For a portable installation instead, download **ai-monitor-p4-v1.17.2-windows.zip** and use **Extract All**. Keep the entire folder, including **_internal**, together. Do not run inside the ZIP. GitHub's **Source code (zip)** contains no ready-to-run programs.
+1. Open **Releases** and download **AI-Monitor-Setup-v1.18.1-windows.exe**. It installs the complete app for your user and opens setup. No administrator access or separate Python installation is required. The release is unsigned; [read the Windows trust notes](WINDOWS_TRUST.md) if SmartScreen warns.
+2. For a portable installation instead, download **ai-monitor-p4-v1.18.1-windows.zip** and use **Extract All**. Keep the entire folder, including **_internal**, together. Do not run inside the ZIP. GitHub's **Source code (zip)** contains no ready-to-run programs.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
 4. In **Setup**, choose your exact board and USB port. Open **AI setup** to choose your providers. Read the visible instructions for each AI. Codex offers official CLI setup/sign-in; ZCode quota needs your own Z.AI Coding Plan key in the masked field. Without that key, ZCode can still report local activity. Click **Save settings**. A blank key field preserves the saved key; **Clear saved key** removes it. Neither board nor AI is preselected on a fresh installation.
 5. For a new board, open **Firmware > Install / update firmware** and choose **First installation**. Review the board/port and type `FLASH`. This resets display settings. For an existing AI Monitor, choose **Update this project's existing installation** to retain settings and enable the new quota selector/large alerts. A new S3 board needs its own factory installation. Progress and errors remain in **Activity**; keep the app and power connected until it finishes.
@@ -25,9 +25,15 @@ Tap **SET**, then **APPEARANCE**. Select NOVA or ORBIT and a Forest/Ocean/Amethy
 
 ## Everyday use
 
+For first-time setup, use the **SETUP PROGRESS** checklist and **Next** button. It leads to missing board/USB/AI choices, then saving and checking the display. Start is disabled while selections are missing, ambiguous or unsaved. If the display does not respond, the next step opens firmware/USB help; review the actual board and port before choosing First installation. The app never flashes automatically.
+
 For NOVA/ORBIT percentages, open **SET > AI USAGE**. Select an AI with PREV/NEXT, then its window. Each option shows remaining quota and data status; the page includes provider setup instructions. Codex has **5 HOURS / 7 DAYS**. ZCode can report **5 HOURS / 7 DAYS** for models and **MONTHLY MCP** for tool calls. Monthly MCP is not a monthly token budget. Known missing windows can be selected, but show **NOT REPORTED** until real data arrives. **AUTO / MOST URGENT** follows the most urgent quota. **REFRESH** reloads available options and requests a host update. Each AI's choice is saved independently; activity-only providers keep LOCAL and alerts still monitor all windows.
 
 Double-click **AI-Monitor.exe**, click **Start host**, then close the window. Use **Stop host** before flashing. The **Activity** and **Host log** tabs show connection messages. The NOVA caption reports readable local token sources; it does not invent activity.
+
+Minimize the app to its **NOVA system tray icon** near the clock; Windows may put it under the **^** overflow arrow. Click the icon or open the shortcut again to restore the existing window. Right-click for **Open AI Monitor**, **Start host**, **Stop host** and **Quit**. The Quit label explains whether your host will keep running or stop. **Ctrl+Q** also quits.
+
+In **Host settings**, **Minimize to tray** is on by default. **Close button hides the app in the system tray** is optional and off by default; otherwise X quits the app using your keep/stop-host preference. Hiding keeps unsaved fields intact and never stops the host. Without a working system tray the app retains normal window controls. No firmware update is needed for tray support on an existing v1.17.2 display.
 
 For firmware upgrades, open **Firmware**, then select **Update this project's existing installation**. This writes the application and retains settings only when the board already uses this project's partition layout. For a different project's firmware, use First installation.
 

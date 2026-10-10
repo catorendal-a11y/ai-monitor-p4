@@ -102,11 +102,17 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Check AI setup** checks selected local sources. Claude users can link and remove the optional subscription-quota integration directly in AI setup. OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage.
 
-**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start when opening the app, and whether closing the app stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
+**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start, minimize/close-to-tray behavior, and whether quitting stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
+
+**NOVA system tray:** minimizing hides the desktop window under its NOVA icon near the clock. Click the icon or open the shortcut again to restore the same window. Right-click for Open, Start host, Stop host and Quit. Close-to-tray is optional; hiding retains unsaved settings and never stops the independent host. Existing v1.17.2 display firmware works with this desktop feature.
+
+[Preview the tray settings](docs/media/desktop-tray-settings.png) (actual desktop app with synthetic setup, no account data).
+
+**Guided setup:** the progress checklist and Next button lead through display, USB port, AI choices, saving and connection checks. Start stays disabled while those selections are incomplete or unsaved. A new/factory board gets firmware help; nothing is flashed automatically. Reopening with automatic host start enabled reuses an existing host.
 
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.17.2-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.17.2-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.18.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.18.1-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -114,7 +120,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.2/AI-Monitor-Setup-v1.17.2-windows.exe)** Â· [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.2/ai-monitor-p4-v1.17.2-windows.zip) Â· [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.2/SHA256SUMS.txt) Â· [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/AI-Monitor-Setup-v1.18.1-windows.exe)** Â· [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/ai-monitor-p4-v1.18.1-windows.zip) Â· [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/SHA256SUMS.txt) Â· [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 

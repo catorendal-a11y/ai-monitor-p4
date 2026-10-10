@@ -9,24 +9,24 @@ from pathlib import Path
 import sys
 import time
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, QSignalBlocker
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, QSignalBlocker, QEvent
 from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap, QShortcut, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame,
     QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
-    QTabWidget, QVBoxLayout, QWidget,
+    QTabWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu,
 )
 
 import aim_control as control
 import desktop_support as desktop
 from board_profiles import BOARDS, get_board
-from host_security import safe_text
+from host_security import safe_text, serial_port
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 from host_status import read_status
 
-APP_VERSION = 'v1.17.2'
+APP_VERSION = 'v1.18.1'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''
@@ -176,6 +176,17 @@ class MonitorWindow(QMainWindow):
         self.close_stop_completed = False
         self.recover_after_action = False
         self.config_error = False
+        self.monitor_enabled = monitor
+        self.tray = None
+        self.quit_requested = False
+        self.hidden_to_tray = False
+        self.restore_state = Qt.WindowState.WindowNoState
+        self.restore_geometry = None
+        self.usb_ports = []
+        self.connection_checked = False
+        self.connection_failed = False
+        self.current_action = None
+        self.live_connected = False
         try:
             self.config = desktop.load_settings(root)
         except (ValueError, OSError):
@@ -201,14 +212,119 @@ class MonitorWindow(QMainWindow):
         self.append_output('The monitor reads usage records and quota status. It does not generate AI requests.')
         shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
         shortcut.activated.connect(self.save)
+        quit_shortcut = QShortcut(QKeySequence('Ctrl+Q'), self)
+        quit_shortcut.activated.connect(self.request_quit)
         self.timer = QTimer(self)
         self.timer.setInterval(2500)
         self.timer.timeout.connect(self.refresh_status)
+        self.tray_timer = QTimer(self)
+        self.tray_timer.setInterval(10000)
+        self.tray_timer.timeout.connect(self.refresh_tray)
         if monitor:
+            self._create_tray()
             self.refresh_status()
             self.timer.start()
             if self.config['start_host_on_open'] and self.config.get('board') and self.config['providers']:
-                QTimer.singleShot(0, self.start)
+                QTimer.singleShot(0, self._auto_start_if_needed)
+
+    def _auto_start_if_needed(self):
+        if control.owned_hosts(self.root):
+            self.append_output('Existing host reused. No restart or extra quota request was needed.')
+            self.refresh_status()
+        else:
+            self.start()
+
+    def _create_tray(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable() or self.windowIcon().isNull(): return
+        self.tray = QSystemTrayIcon(self.windowIcon(), self)
+        menu = QMenu(self)
+        menu.addAction('Open AI Monitor', self.restore_from_tray)
+        menu.addSeparator()
+        self.tray_start = menu.addAction('Start host', self.start)
+        self.tray_stop = menu.addAction('Stop host', self.stop)
+        menu.addSeparator()
+        self.tray_quit = menu.addAction('Quit AI Monitor', self.request_quit)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(self._tray_activated)
+        self.tray.show()
+        self._apply_preferences()
+        self.refresh_tray()
+        self.tray_timer.start()
+
+    def _tray_available(self):
+        return self.tray is not None and self.tray.isVisible() and QSystemTrayIcon.isSystemTrayAvailable()
+
+    def refresh_tray(self):
+        if self.tray is None: return
+        if self.hidden_to_tray and not QSystemTrayIcon.isSystemTrayAvailable():
+            self.restore_from_tray()
+            self.notice.setText('The system tray is unavailable. AI Monitor has reopened.')
+        try:
+            processes = control.owned_hosts(self.root)
+            summary = desktop.connection_summary(self.root, processes)
+        except (ValueError, OSError, control.psutil.Error):
+            processes = []; summary = 'STATUS UNAVAILABLE — OPEN AI MONITOR'
+        self.tray.setToolTip('AI Monitor • ' + summary)
+        self.tray_start.setEnabled(not self.busy and not processes and not self.unsaved and
+                                   bool(self.config.get('board') and self.config['providers']) and not self.config_error)
+        self.tray_stop.setEnabled(not self.busy and bool(processes))
+        self.tray_quit.setEnabled(not self.busy)
+        self.tray_quit.setText('Quit AI Monitor — ' + ('keep host running' if self.config['keep_host_on_close'] else 'stop host'))
+
+    def hide_to_tray(self):
+        if not self._tray_available(): return False
+        if not self.isMinimized(): self.restore_geometry = self.saveGeometry()
+        self.restore_state = self.windowState() & ~Qt.WindowState.WindowMinimized
+        self.hidden_to_tray = True
+        self.hide()
+        self.timer.stop()  # The independent host keeps monitoring; avoid duplicate UI database polling.
+        self.refresh_tray()
+        return True
+
+    def restore_from_tray(self):
+        state = self.restore_state if self.hidden_to_tray else self.windowState() & ~Qt.WindowState.WindowMinimized
+        if self.hidden_to_tray and self.restore_geometry is not None:
+            self.restoreGeometry(self.restore_geometry)
+        self.setWindowState(state)
+        self.show(); self.raise_(); self.activateWindow()
+        self.hidden_to_tray = False
+        if self.monitor_enabled:
+            self.token_reporter = None  # Resume with a baseline, not an accumulated hidden-window activity burst.
+            self.refresh_status(); self.timer.start()
+
+    def _tray_activated(self, reason):
+        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
+            self.restore_from_tray()
+
+    def request_quit(self):
+        if self.busy:
+            self.restore_from_tray()
+            self.notice.setText('Wait for the current action to finish before quitting.')
+            return
+        self.quit_requested = True
+        if self.unsaved: self.restore_from_tray()
+        self.close()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if (event.type() == QEvent.Type.WindowStateChange and self.isMinimized() and
+                hasattr(self, 'config') and self.config.get('minimize_to_tray') and self._tray_available()):
+            QTimer.singleShot(0, self._hide_minimized)
+
+    def _hide_minimized(self):
+        if self.isMinimized(): self.hide_to_tray()
+
+    def _remember_geometry(self):
+        if self.isVisible() and not self.isMinimized() and not self.hidden_to_tray:
+            self.restore_geometry = self.saveGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'hidden_to_tray'): self._remember_geometry()
+
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        if hasattr(self, 'hidden_to_tray'): self._remember_geometry()
 
     def _remember_secrets(self):
         for value in (self.config.get('zai_key', ''), os.environ.get('ZAI_API_KEY', '')):
@@ -321,6 +437,12 @@ class MonitorWindow(QMainWindow):
         form.setSpacing(10)
         form.addWidget(label('Choose your display and USB connection here. Choose your AIs in AI setup, '
                              'save settings, then install display firmware if needed and start the host.', 'muted', True))
+        form.addWidget(label('SETUP PROGRESS', 'eyebrow'))
+        self.setup_progress = label('', 'muted', True)
+        self.setup_progress.setAccessibleName('Setup progress')
+        form.addWidget(self.setup_progress)
+        self.setup_next = self._button('Continue setup', self.continue_setup, primary=True)
+        form.addWidget(self.setup_next)
         form.addWidget(label('DISPLAY AND CONNECTION', 'eyebrow'))
         fields = QGridLayout()
         self.board = QComboBox()
@@ -455,9 +577,14 @@ class MonitorWindow(QMainWindow):
             field.valueChanged.connect(self._changed)
         layout.addLayout(grid)
         self.auto_start = QCheckBox('Start the host when this app opens')
-        self.keep_host = QCheckBox('Keep the host running when I close this app')
-        for field in (self.auto_start, self.keep_host):
+        self.keep_host = QCheckBox('Keep the host running when I quit AI Monitor')
+        self.minimize_tray = QCheckBox('Minimize to the NOVA system tray icon')
+        self.close_tray = QCheckBox('Close button hides the app in the system tray')
+        for field in (self.auto_start, self.keep_host, self.minimize_tray, self.close_tray):
             field.toggled.connect(self._changed); layout.addWidget(field)
+        layout.addWidget(label('Click the NOVA icon near the clock to reopen. Right-click it for host controls and Quit. '
+                               'Hiding or minimizing never stops the host or discards unsaved settings. '
+                               'If a system tray is unavailable, the window uses normal minimize/close behavior.', 'muted', True))
         layout.addWidget(label('Automatic start is opt-in and applies when you open AI Monitor. It does not install a Windows service '
                                'or add a sign-in task. USB choices are still validated before starting.', 'muted', True))
         self.provider_health = label('Start the host to see provider health. Token activity and account quota are separate.', 'muted', True)
@@ -519,6 +646,8 @@ class MonitorWindow(QMainWindow):
         self.log_size.setValue(self.config['log_font_size'])
         self.auto_start.setChecked(self.config['start_host_on_open'])
         self.keep_host.setChecked(self.config['keep_host_on_close'])
+        self.minimize_tray.setChecked(self.config['minimize_to_tray'])
+        self.close_tray.setChecked(self.config['close_to_tray'])
         self._apply_preferences()
         self.unsaved = False
         self._changed(mark=False)
@@ -540,7 +669,62 @@ class MonitorWindow(QMainWindow):
             self.board_help.setObjectName('muted')
         if mark:
             self.unsaved = True
+            self.connection_checked = False
+            self.connection_failed = False
+            self.live_connected = False
             self.notice.setText('Unsaved changes — save before starting or preparing firmware.')
+        self._update_setup_progress()
+
+    def _usb_setup_issue(self):
+        try: port = serial_port(self.port.currentText())
+        except ValueError: return 'Enter a valid USB port, for example COM6.'
+        board_id = self.board.currentData()
+        if port == 'auto' and board_id in BOARDS:
+            matches = sum(getattr(item, 'vid', None) in get_board(board_id).usb_vids for item in self.usb_ports)
+            if matches > 1: return 'Several matching boards are connected. Select the display’s explicit COM port.'
+        return ''
+
+    def _update_setup_progress(self):
+        if not hasattr(self, 'setup_next') or not hasattr(self, 'providers'): return
+        chosen = [key for key, box in self.providers.items() if box.isChecked()]
+        board_ready = self.board.currentData() in BOARDS
+        issue = self._usb_setup_issue()
+        self.setup_progress.setText('Display: ' + ('chosen' if board_ready else 'choose your board') +
+            ' • USB: ' + ('needs selection' if issue else 'selected') +
+            ' • AI providers: ' + str(len(chosen)) + ' selected • Settings: ' +
+            ('not saved' if self.unsaved or not board_ready or not chosen else 'saved'))
+        if self.config_error: caption = 'Recover settings in Host settings'
+        elif not board_ready: caption = 'Next: choose your display board'
+        elif issue: caption = 'Next: select the display USB port'
+        elif not chosen: caption = 'Next: choose and set up my AIs'
+        elif self.unsaved: caption = 'Next: save settings'
+        elif self.live_connected: caption = 'Connected: view host and AI status'
+        elif self.connection_checked: caption = 'Next: start host'
+        elif self.connection_failed: caption = 'Next: firmware and USB help'
+        else: caption = 'Next: check the display connection'
+        self.setup_next.setText(caption)
+        self.setup_next.setEnabled(not self.busy)
+        self.start_button.setEnabled(not self.busy and not self.config_error and
+            not self.unsaved and board_ready and bool(chosen) and not issue)
+
+    def continue_setup(self):
+        if self.busy: return
+        if self.config_error: self.tabs.setCurrentIndex(2); return
+        if self.board.currentData() not in BOARDS:
+            self.tabs.setCurrentIndex(0); self.board.setFocus(); self.board.showPopup(); return
+        if self._usb_setup_issue():
+            self.tabs.setCurrentIndex(0); self.port.setFocus()
+            self.notice.setText(self._usb_setup_issue()); return
+        if not any(box.isChecked() for box in self.providers.values()):
+            self.tabs.setCurrentIndex(1); return
+        if self.unsaved: self.save(); self._update_setup_progress(); return
+        if self.live_connected: self.tabs.setCurrentIndex(2); return
+        if self.connection_checked: self.start()
+        elif self.connection_failed:
+            self.tabs.setCurrentIndex(3)
+            self.notice.setText('Check the saved USB port and cable. For a new/factory display, choose First installation here. '
+                                'Firmware is written only after review and FLASH confirmation.')
+        else: self.check_connection()
 
     def _provider_changed(self, provider, checked):
         if checked and hasattr(self, 'provider_guide'):
@@ -588,9 +772,11 @@ class MonitorWindow(QMainWindow):
             try:
                 ports = sorted(control.list_ports.comports(), key=lambda p: p.device)
             except OSError:
+                self.usb_ports = []
                 self.usb_help.setText('USB scan unavailable. Enter your explicit port and check the connection.')
                 self.port.setCurrentText(current)
                 return
+            self.usb_ports = ports
             for item in ports:
                 self.port.addItem(safe_text(item.device))
                 self.port.setItemData(self.port.count()-1, safe_text(item.description), Qt.ItemDataRole.ToolTipRole)
@@ -599,8 +785,10 @@ class MonitorWindow(QMainWindow):
         self.usb_help.setText(('Available: ' + ' | '.join(descriptions) + '\nAuto requires exactly one matching USB device. '
                               'With several devices, select the display port explicitly.') if ports else
                              'No USB ports found. Connect a USB data cable, then Rescan USB. Your saved port is preserved.')
+        self._update_setup_progress()
 
     def _error(self, text: str):
+        if self.hidden_to_tray: self.restore_from_tray()
         self.notice.setText(text)
         self.append_output(text)
         QMessageBox.warning(self, 'Check your settings', text)
@@ -618,7 +806,8 @@ class MonitorWindow(QMainWindow):
                 self.port.currentText(), self.interval.value(), self.key.text(), self.clear_key.isChecked(),
                 options={'reconnect_s': self.reconnect.value(), 'token_poll_s': self.token_poll.value(),
                          'log_font_size': self.log_size.value(), 'start_host_on_open': self.auto_start.isChecked(),
-                         'keep_host_on_close': self.keep_host.isChecked()})
+                         'keep_host_on_close': self.keep_host.isChecked(),
+                         'minimize_to_tray': self.minimize_tray.isChecked(), 'close_to_tray': self.close_tray.isChecked()})
         except (control.SetupError, ValueError, OSError):
             self._error('Choose a supported board, at least one provider and a valid USB port. '
                         'API keys must be a single printable token. Nothing was saved.')
@@ -627,8 +816,10 @@ class MonitorWindow(QMainWindow):
         self.key.clear()
         self.clear_key.setChecked(False)
         self.unsaved = False
+        self.live_connected = False
         self.token_reporter = None
         self._apply_preferences()
+        self._update_setup_progress()
         self.notice.setText('Settings saved. Existing keys were preserved unless you explicitly changed or cleared them.')
         self.append_output('Settings saved. Board: ' + get_board(self.config['board']).name)
         if 'codex' in self.config['providers'] and 'codex' not in previous_providers:
@@ -650,6 +841,7 @@ class MonitorWindow(QMainWindow):
         if self.busy:
             return
         self.busy = True
+        self.current_action = name
         for button in (self.start_button, self.stop_button, self.save_button,
                        self.flash_button, self.integration_button, self.rescan_button, self.check_usb_button):
             button.setEnabled(False)
@@ -657,12 +849,17 @@ class MonitorWindow(QMainWindow):
         self.progress.show()
         self.console_tabs.setCurrentIndex(0)
         self.notice.setText(name + '…')
+        self.refresh_tray()
         self.worker = ActionWorker(action, name)
         self.worker.signals.output.connect(self.append_output)
         self.worker.signals.finished.connect(self._finished)
         self.pool.start(self.worker)
 
     def _finished(self, success, message):
+        if self.current_action == 'Checking USB identity':
+            self.connection_checked = success
+            self.connection_failed = not success
+        self.current_action = None
         self.busy = False
         self.progress.hide()
         self.tabs.setEnabled(True)
@@ -673,7 +870,11 @@ class MonitorWindow(QMainWindow):
         self.append_output(message)
         self.worker = None
         if not success:
+            self.quit_requested = False
+            if self.hidden_to_tray: self.restore_from_tray()
             QMessageBox.warning(self, 'Action could not finish', message)
+        elif message == 'Checking USB identity complete.':
+            self.notice.setText('Display verified. Start the host if it is stopped; otherwise check AI status in Host settings.')
         if self.recover_after_action:
             self.recover_after_action = False
             if success:
@@ -683,6 +884,8 @@ class MonitorWindow(QMainWindow):
                 self._load_fields()
                 self.append_output('Settings reset. The original file was backed up locally; keep that backup private.')
         self.refresh_status()
+        self.refresh_tray()
+        self._update_setup_progress()
         if self.close_after_stop:
             self.close_after_stop = False
             if success:
@@ -711,8 +914,11 @@ class MonitorWindow(QMainWindow):
         self._run('Recovering local settings', lambda emit: desktop.reset_invalid_settings(self.root))
 
     def _apply_preferences(self):
-        self.close_hint.setText('LOCAL RECORDS + USB\n' + ('Close this window and your\nhost keeps running.' if self.config['keep_host_on_close'] else
-                               'Closing this window stops\nthis installation\'s host.'))
+        if self.config['close_to_tray']:
+            hint = 'Close hides the app in the NOVA tray.\nUse the tray menu to Quit.'
+        else:
+            hint = 'Quit keeps your host running.' if self.config['keep_host_on_close'] else 'Quit stops this installation\'s host.'
+        self.close_hint.setText('LOCAL RECORDS + USB\n' + hint)
         for box in (self.activity, self.host_log):
             box.setStyleSheet('QPlainTextEdit { font-family: "Consolas"; font-size: ' +
                               str(self.config['log_font_size']) + 'pt; }')
@@ -780,6 +986,10 @@ class MonitorWindow(QMainWindow):
             self.host_state.setText(desktop.connection_summary(self.root, processes))
             health = read_status(self.root, {process.pid for process in processes})
             states = health.get('providers', {}) if health else {}
+            self.live_connected = bool(health and health['state'] == 'connected' and
+                health.get('board') == self.config.get('board') and
+                self.config['port'] in ('auto', health.get('port')))
+            self._update_setup_progress()
             captions = {'ready': 'quota received', 'unavailable': 'quota unavailable — check Host log / Provider setup',
                         'activity_only': 'activity only; no account quota'}
             self.provider_health.setText('\n'.join(PROVIDERS[key][0] + ': ' + captions.get(states.get(key),
@@ -810,6 +1020,8 @@ class MonitorWindow(QMainWindow):
             self.token_state.setText('Local status unavailable; check the host log.')
 
     def closeEvent(self, event):
+        if not self.quit_requested and self.config.get('close_to_tray') and self.hide_to_tray():
+            event.ignore(); return
         if self.busy:
             self.notice.setText('Wait for the current action to finish before closing this window.')
             event.ignore()
@@ -818,6 +1030,7 @@ class MonitorWindow(QMainWindow):
             answer = QMessageBox.question(self, 'Unsaved settings', 'Close without saving your changes?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
+                self.quit_requested = False
                 event.ignore(); return
             self.unsaved = False
         if not self.config['keep_host_on_close'] and not self.close_stop_completed:
@@ -826,7 +1039,10 @@ class MonitorWindow(QMainWindow):
             self.stop()
             return
         self.timer.stop()
+        self.tray_timer.stop()
+        if self.tray is not None: self.tray.hide()
         event.accept()  # The independent background host is deliberately left running.
+        if self.monitor_enabled: QTimer.singleShot(0, QApplication.instance().quit)
 
 
 def run_desktop(firmware: bool = False) -> int:
@@ -835,12 +1051,21 @@ def run_desktop(firmware: bool = False) -> int:
     application.setOrganizationName('AI Monitor contributors')
     application.setStyle('Fusion')
     try:
+        from desktop_instance import DesktopInstance
+        instance = DesktopInstance(control.ROOT)
+        if not instance.claim(firmware): return 0
         window = MonitorWindow()
-    except (ValueError, OSError):
+    except (ValueError, OSError, RuntimeError):
         QMessageBox.critical(None, 'Configuration unavailable',
-            'Repair the local tools/aim_host.json file or extract a fresh package. Your file was not changed.')
+            'AI Monitor could not open. If it is already running, use the NOVA tray icon. '
+            'Otherwise use a writable folder and check the local settings. Your file was not changed.')
         return 1
+    def reopen(page):
+        if page == 'firmware': window.tabs.setCurrentIndex(3)
+        window.restore_from_tray()
+    instance.requested.connect(reopen)
     if firmware:
         window.tabs.setCurrentIndex(3)
     window.show()
-    return application.exec()
+    try: return application.exec()
+    finally: instance.close()

@@ -1,3 +1,16 @@
+# AI Monitor v1.18.1
+
+The Windows app can minimize to the original NOVA icon in the system tray. Click the icon or open the shortcut again to restore the existing window. Right-click the icon for Open, Start host, Stop host and Quit; the Quit label states whether the host will keep running or stop.
+
+Setup now has a progress checklist and a Next button for board, USB, provider selection, saving and identity checking. Ambiguous USB selection is shown before starting. A failed identity check guides to firmware/USB help without writing anything automatically. Automatic start reuses an already running host rather than restarting it and issuing another quota request.
+
+- **Host settings** saves Minimize to tray (on by default) and Close button hides in tray (optional, off by default). Normal close behavior is retained unless explicitly changed.
+- Hiding retains unsaved selections/key input and preserves window size/maximized state. It never stops the independent host. UI token-database polling pauses while hidden; the tray shows lightweight USB/host status.
+- A new launch restores the existing window instead of creating duplicate icons. The local handoff uses a per-installation lock and a user-restricted local pipe; only fixed window/page commands are accepted. No TCP listener, host control, credential reply or file request is exposed.
+- Errors from a hidden background action reopen the app. Quit waits for ongoing work, confirms unsaved changes, and respects the saved host stop/keep setting. Ctrl+Q is an explicit Quit shortcut. If a tray is unavailable, normal window behavior remains available.
+
+The Windows host works with existing v1.17.2 displays; a firmware update is not required for tray support. Windows binaries remain unsigned and S3 remains experimental.
+
 # AI Monitor v1.17.2
 
 Windows command discovery now ignores npm's extensionless POSIX shell launcher and selects a Windows `.exe` or supported `.cmd`/`.bat` wrapper instead. This fixes Codex quota reads from an Explorer-launched app when the development terminal had a different PATH. Existing Codex sign-in is reused; no new account or key is imported.
