@@ -2,6 +2,8 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
+![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
+
 <p align="center">
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
@@ -46,8 +48,6 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 </p>
 
 *Quota needs the provider's supported account/key/bridge. Gemini and external numeric bridges report activity only. S3 remains experimental. Windows binaries are currently unsigned.*
-
-![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
 **[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
