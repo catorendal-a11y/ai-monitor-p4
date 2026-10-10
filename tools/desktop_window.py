@@ -439,7 +439,6 @@ class MonitorWindow(QMainWindow):
                              'save settings, then install display firmware if needed and start the host.', 'muted', True))
         form.addWidget(label('SETUP PROGRESS', 'eyebrow'))
         self.setup_progress = label('', 'muted', True)
-        self.setup_progress.setAccessibleName('Setup progress')
         form.addWidget(self.setup_progress)
         self.setup_next = self._button('Continue setup', self.continue_setup, primary=True)
         form.addWidget(self.setup_next)
@@ -570,8 +569,11 @@ class MonitorWindow(QMainWindow):
         self.log_size = QSpinBox(); self.log_size.setRange(10, 18); self.log_size.setSuffix(' pt')
         self.log_size.setAccessibleName('Terminal font size')
         grid = QGridLayout()
+        grid.setVerticalSpacing(8)
         for row, (caption, field) in enumerate((('Retry USB connection', self.reconnect),
                 ('Read local token activity', self.token_poll), ('Terminal text size', self.log_size))):
+            field.setMinimumHeight(44)
+            grid.setRowMinimumHeight(row, 44)
             text = label(caption); text.setBuddy(field)
             grid.addWidget(text, row, 0); grid.addWidget(field, row, 1)
             field.valueChanged.connect(self._changed)

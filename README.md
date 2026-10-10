@@ -110,6 +110,8 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Guided setup:** the progress checklist and Next button lead through display, USB port, AI choices, saving and connection checks. Start stays disabled while those selections are incomplete or unsaved. A new/factory board gets firmware help; nothing is flashed automatically. Reopening with automatic host start enabled reuses an existing host.
 
+[Preview guided setup](docs/media/desktop-guided-setup.png) · [Desktop performance measurements](docs/DESKTOP_PERFORMANCE.md).
+
 ## Get running on Windows
 
 1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.18.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.18.1-windows.zip** into a writable folder and keep its contents together.
