@@ -189,7 +189,9 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   testAppearance = app_settings::Appearance{}; ui_theme::apply(testAppearance.theme);
   set_sample(3, 2);
   nova_ui::page = 0;
-  std::strcpy(sample.views[1].rows[1].title, "Monthly"); sample.views[1].rows[1].windowMinutes = 43200;
+  sample.views[1].rowCount = 3;
+  sample.views[1].rows[2] = sample.views[1].rows[1];
+  std::strcpy(sample.views[1].rows[2].title, "Monthly MCP"); sample.views[1].rows[2].windowMinutes = 43200;
   ui_nova_show();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "67%");
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "7 DAYS / AUTO");
@@ -198,13 +200,22 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   CHECK(std::string(lv_label_get_text(quotaProviderLabel)) == "CODEX");
   CHECK(std::string(lv_label_get_text(quotaCaptions[1])) == "5 HOURS");
   CHECK(std::string(lv_label_get_text(quotaCaptions[2])) == "7 DAYS");
+  CHECK(std::string(lv_label_get_text(quotaProviderHelp)).find("weekly limit") != std::string::npos);
+  CHECK(std::string(lv_label_get_text(quotaDetails[1])) == "75% left / REPORTED");
   lv_obj_send_event(quotaButtons[1], LV_EVENT_CLICKED, nullptr); ui_settings_update();
   CHECK(app_settings::nova_window("codex").minutes == 300);
   CHECK(std::string(lv_label_get_text(saveFeedback)) == "SAVED");
   lv_obj_update_layout(lv_layer_top());
   auto* card = lv_obj_get_child(quotaOverlay, 0);
-  for (auto* button : quotaButtons) if (!lv_obj_is_hidden(button)) check_inside(card, button);
-  check_inside(card, quotaSelectionLabel); check_inside(card, quotaProviderLabel);
+  for (size_t i = 0; i < 4; ++i) if (!lv_obj_is_hidden(quotaButtons[i])) {
+    check_inside(card, quotaButtons[i]); check_inside(quotaButtons[i], quotaCaptions[i]);
+    check_inside(quotaButtons[i], quotaDetails[i]); check_readable_text(quotaCaptions[i]); check_readable_text(quotaDetails[i]);
+    lv_area_t caption{}, detail{}; lv_obj_get_coords(quotaCaptions[i], &caption); lv_obj_get_coords(quotaDetails[i], &detail);
+    CHECK(caption.y2 < detail.y1);
+  }
+  for (auto* label : {quotaSelectionLabel, quotaProviderLabel, quotaProviderHelp, quotaSetupHelp}) {
+    check_inside(card, label); check_readable_text(label);
+  }
   screenshot(screenshots, "settings-quota-codex");
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "75%");
@@ -213,11 +224,18 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
   lv_obj_send_event(quotaNext, LV_EVENT_CLICKED, nullptr);
   CHECK(std::string(lv_label_get_text(quotaProviderLabel)) == "Z CODE");
-  CHECK(std::string(lv_label_get_text(quotaCaptions[2])) == "MONTHLY");
-  lv_obj_send_event(quotaButtons[2], LV_EVENT_CLICKED, nullptr);
+  CHECK(std::string(lv_label_get_text(quotaCaptions[2])) == "7 DAYS");
+  CHECK(std::string(lv_label_get_text(quotaCaptions[3])) == "MONTHLY MCP");
+  CHECK(std::string(lv_label_get_text(quotaProviderHelp)).find("not a monthly token budget") != std::string::npos);
+  CHECK(std::string(lv_label_get_text(quotaSetupHelp)).find("Coding Plan API key") != std::string::npos);
+  lv_obj_send_event(quotaButtons[3], LV_EVENT_CLICKED, nullptr);
   CHECK(app_settings::nova_window("zcode").minutes == 43200);
   CHECK(app_settings::nova_window("codex").minutes == 300);
   ui_settings_update(); screenshot(screenshots, "settings-quota-zcode");
+  lv_obj_update_layout(lv_layer_top());
+  for (auto* label : {quotaSelectionLabel, quotaProviderLabel, quotaProviderHelp, quotaSetupHelp}) {
+    check_inside(card, label); check_readable_text(label);
+  }
   lv_obj_send_event(quotaNext, LV_EVENT_CLICKED, nullptr);
   CHECK(std::string(lv_label_get_text(quotaProviderLabel)) == "CLAUDE");
   lv_obj_send_event(quotaButtons[2], LV_EVENT_CLICKED, nullptr);
@@ -231,14 +249,14 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "67%");
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "7 DAYS");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[1].status)) == "MONTHLY");
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[1].status)) == "MONTHLY MCP");
   screenshot(screenshots, "nova-quota-week-month");
   // A harmless API title change retains the unique matching duration.
   std::strcpy(sample.views[0].rows[0].title, "Secondary"); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "67%");
   ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
   CHECK(std::string(lv_label_get_text(quotaSelectionLabel)) == "Selected: 7 DAYS");
-  CHECK(lv_color_eq(lv_obj_get_style_bg_color(quotaButtons[1], LV_PART_MAIN), lv_color_hex(ui_theme::accent)));
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(quotaButtons[2], LV_PART_MAIN), lv_color_hex(ui_theme::accent)));
   close_quota(nullptr); ui_settings_hide();
   // Ambiguous same-duration quotas must not be silently substituted.
   sample.views[0].rows[1].windowMinutes = 10080;
@@ -272,17 +290,60 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   sample.hostPresent = false; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "OFFLINE / last good");
   CHECK(app_settings::nova_window("codex").minutes == 300);
-  // Only reported quotas are selectable for activity-only integrations.
+  // Known windows remain selectable without fabricating missing percentages.
   set_sample(1, 0); sample.views[0].hasUsage = false; sample.views[0].informational = true;
   ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
-  CHECK(quotaChoiceCount == 0 && !lv_obj_is_hidden(quotaButtons[0]) && lv_obj_is_hidden(quotaButtons[1]));
+  CHECK(quotaChoiceCount == 2 && !lv_obj_is_hidden(quotaButtons[1]) && !lv_obj_is_hidden(quotaButtons[2]));
+  CHECK(std::string(lv_label_get_text(quotaDetails[2])).find("NOT REPORTED") == 0);
+  lv_obj_send_event(quotaButtons[2], LV_EVENT_CLICKED, nullptr);
+  CHECK(app_settings::nova_window("codex").minutes == 10080);
+  CHECK(std::string(lv_label_get_text(quotaSelectionLabel)).find("not currently reported") != std::string::npos);
+  screenshot(screenshots, "settings-quota-missing");
+  const auto savedRevision = app_settings::save_revision();
+  // New data is shown without closing Settings or rebinding a held target.
+  set_sample(1, 2); fakeTick += 501; ui_settings_update();
+  CHECK(std::string(lv_label_get_text(quotaDetails[2])) == "67% left / REPORTED");
+  CHECK(app_settings::save_revision() == savedRevision);
+  CHECK(app_settings::nova_window("codex").minutes == 10080);
+  sample.views[0].fetching = true; fakeTick += 501; ui_settings_update();
+  CHECK(std::string(lv_label_get_text(quotaDetails[2])).find("UPDATING") != std::string::npos);
+  sample.views[0].fetching = false; sample.views[0].notice = true; fakeTick += 501; ui_settings_update();
+  CHECK(std::string(lv_label_get_text(quotaDetails[2])).find("ERROR") != std::string::npos);
+  sample.hostPresent = false; fakeTick += 501; ui_settings_update();
+  CHECK(std::string(lv_label_get_text(quotaDetails[2])).find("OFFLINE") != std::string::npos);
+  CHECK(std::string(lv_label_get_text(quotaSetupHelp)).find("Host offline") == 0);
+  CHECK(app_settings::save_revision() == savedRevision);
+  sample.hostPresent = true; sample.views[0].notice = false;
+  std::strcpy(sample.views[0].providerKey, "gemini"); std::strcpy(sample.viewKeys[0], "gemini");
+  sample.views[0].rowCount = 0; sample.views[0].hasUsage = false; sample.views[0].informational = true;
+  refresh_quota(nullptr);
+  CHECK(quotaChoiceCount == 0 && lv_obj_is_hidden(quotaButtons[1]));
+  CHECK(std::string(lv_label_get_text(quotaProviderHelp)).find("Local token activity only") == 0);
   CHECK(std::string(lv_label_get_text(quotaSelectionLabel)).find("No quota windows reported") == 0);
+  screenshot(screenshots, "settings-quota-local-only");
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "LOCAL");
   sample = aim::Snapshot{}; ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
   CHECK(!quotaProviderCount && lv_obj_has_state(quotaNext, LV_STATE_DISABLED));
   CHECK(std::string(lv_label_get_text(quotaProviderLabel)) == "No providers configured");
   ui_settings_hide(); CHECK(lv_obj_is_hidden(quotaOverlay));
+  // Unknown real windows are retained instead of being crowded out by defaults.
+  set_sample(1, 1); std::strcpy(sample.views[0].providerKey, "zcode"); std::strcpy(sample.viewKeys[0], "zcode");
+  sample.views[0].rows[0].windowMinutes = 1440; std::strcpy(sample.views[0].rows[0].title, "Daily");
+  ui_settings_show(); open_quota(nullptr);
+  CHECK(quotaChoices[0].minutes == 1440);
+  CHECK(std::string(lv_label_get_text(quotaCaptions[1])) == "1 DAYS");
+  close_quota(nullptr); ui_settings_hide();
+  set_sample(8, 0); std::strcpy(sample.views[7].providerKey, "opencode"); std::strcpy(sample.viewKeys[7], "opencode");
+  ui_settings_show(); open_quota(nullptr); CHECK(quotaProviderCount == 8);
+  for (size_t i = 0; i < 8; ++i) {
+    lv_obj_update_layout(lv_layer_top());
+    for (auto* label : {quotaSelectionLabel, quotaProviderLabel, quotaProviderHelp, quotaSetupHelp}) {
+      check_inside(card, label); check_readable_text(label);
+    }
+    lv_obj_send_event(quotaNext, LV_EVENT_CLICKED, nullptr);
+  }
+  close_quota(nullptr); ui_settings_hide();
   testNovaWindows.clear(); set_sample(2, 2);
 }
 

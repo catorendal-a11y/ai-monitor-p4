@@ -1,3 +1,10 @@
+# AI Monitor v1.16.1 (unreleased)
+
+- **SET > AI USAGE** explains each provider's quota windows and PC setup. Each choice shows remaining quota and REPORTED/NOT REPORTED/OFFLINE/ERROR/UPDATING/STALE status.
+- Known windows can be selected while waiting for data, without fabricated percentages. Live values update in Settings without rebinding touch targets; REFRESH reloads choices explicitly.
+- ZCode now includes the monthly MCP tool quota and correctly labels its model weekly quota as 7 DAYS. Monthly MCP is not a monthly model-token budget.
+- Missing-data, live-update, quota selection, text layout and ZCode API fixtures are covered by regression tests.
+
 # AI Monitor v1.16.0
 
 The NOVA/ORBIT companion panel is narrower, leaving more room for readable AI status and usage on the right. The robot keeps its original size and is recentered by trimming transparent canvas margins.

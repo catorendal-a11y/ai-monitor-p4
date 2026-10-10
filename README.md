@@ -131,11 +131,17 @@ Codex setup uses the official client and your own sign-in flow; the monitor does
 
 ## Make it yours
 
-On NOVA or ORBIT, open **SET > QUOTA WINDOW**, use PREV/NEXT to choose an AI, then select its displayed window. Codex offers **5 HOURS / 7 DAYS** when reported; ZCode offers **5 HOURS / MONTHLY** when supplied by its plan. Other providers list their actual available quotas. **AUTO / MOST URGENT** follows the most urgent window. Each AI's choice is saved on the display and survives reboot/application updates. Missing selected windows show unavailable; activity-only providers retain LOCAL status. Alerts still monitor every window.
+On NOVA or ORBIT, open **SET > AI USAGE**. PREV/NEXT chooses an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
+
+- **Codex:** **5 HOURS** is the short-term limit; **7 DAYS** is the weekly limit. Sign in to the official Codex CLI with ChatGPT from the PC app.
+- **ZCode:** **5 HOURS / 7 DAYS** are model quotas when supplied by the plan; **MONTHLY MCP** is the separate monthly tool-call quota, not a monthly model-token budget. Add your own ZAI Coding Plan key in the PC app. [Official ZCode usage guide](https://zcode.z.ai/en/docs/usage-stats).
+- **Claude Code:** optional statusline bridge for reported **5 HOURS / 7 DAYS**. **Gemini CLI:** local recorded activity only. External editor integrations explain their numeric bridge requirements.
+
+Known windows remain visible and can be selected before their data arrives. **NOT REPORTED** never means unused quota: NOVA/ORBIT shows unavailable until real data is received. Percentages update while Settings is open; **REFRESH** reloads the reported options and requests a host update. **AUTO / MOST URGENT** follows the most urgent quota. Choices are saved independently on the display, and alerts still check every window.
 
 | Codex window selection | ZCode window selection |
 | --- | --- |
-| ![Codex 5-hour and 7-day quota choices](docs/ui/settings-quota-codex.png) | ![ZCode 5-hour and monthly quota choices](docs/ui/settings-quota-zcode.png) |
+| ![Codex quota choices and sign-in help](docs/ui/settings-quota-codex.png) | ![ZCode model quotas and monthly MCP tool quota](docs/ui/settings-quota-zcode.png) |
 
 On the display, open **SET > APPEARANCE**. Choose **NOVA** or **ORBIT**, then **Forest**, **Ocean**, **Amethyst** or **Ember**. Changes apply immediately and are saved on the display. Provider branding and warning colors keep their meanings across themes.
 

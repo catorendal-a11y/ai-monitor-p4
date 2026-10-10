@@ -21,7 +21,9 @@ The graphical app exposes these limitations in each provider's tooltip; the cons
 
 Use ZCode normally on this PC for local token activity. For quota percentages, obtain your own **GLM Coding Plan API key** from the appropriate plan page in your Z.AI account; [official key instructions](https://docs.z.ai/devpack/quick-start). Select ZCode in Setup, paste the key into the masked field and save. The monitor does not recover ZCode's encrypted login or ask for your Z.AI password. Leave the key blank if you only want local activity; an existing saved key is preserved unless explicitly replaced or cleared.
 
-The quota adapter displays the rows returned by the account's quota endpoint, including five-hour and monthly rows when available. Limits depend on the plan and provider version; a monthly row is not automatically a model-token monthly budget. **SET > QUOTA WINDOW** lists actual reported rows. Missing data remains unavailable. Keep local configuration private.
+The quota adapter separates model quotas (**5 HOURS / 7 DAYS**) from the monthly MCP tool allowance (**MONTHLY MCP**) when reported. In the provider response, `CREDIT_LIMIT` / `TOKENS_LIMIT` model windows use hours (`unit=3`, normally `number=5`) or weeks (`unit=6`, normally `number=1`); `TIME_LIMIT` is the monthly MCP allowance. A monthly subscription payment is not a monthly token budget. **SET > AI USAGE** explains the windows and key setup, shows each remaining percentage/data status, and saves the selected window. Missing windows remain unavailable even if selected. Keep local configuration private.
+
+Primary references: [ZCode quota and tool usage](https://zcode.z.ai/en/docs/usage-stats), [Coding Plan usage rules](https://docs.z.ai/devpack/overview), [official usage-query script](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs).
 
 ## Claude Code
 

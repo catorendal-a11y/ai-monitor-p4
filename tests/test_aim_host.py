@@ -546,6 +546,33 @@ class ConfigTests(unittest.TestCase):
 
 
 class ProviderTests(unittest.TestCase):
+    def test_zcode_keeps_model_week_and_monthly_mcp_separate(self):
+        context = self.response({"success": True, "data": {"limits": [
+            {"type": "CREDIT_LIMIT", "unit": 3, "number": 5, "percentage": 25},
+            {"type": "CREDIT_LIMIT", "unit": 6, "number": 1, "percentage": 60},
+            {"type": "TIME_LIMIT", "percentage": 12, "currentValue": 12, "usage": 100},
+        ]}})
+        with patch.object(host, "open_provider_request", return_value=context):
+            rows, notice = host.fetch_zcode("test-key")
+        self.assertIsNone(notice)
+        self.assertEqual([(row["title"], row["windowMinutes"]) for row in rows],
+                         [("Session", 300), ("Week", 10080), ("Monthly MCP", 43200)])
+        self.assertEqual([row["usedPercent"] for row in rows], [25, 60, 12])
+
+    def test_zcode_monthly_counts_require_a_real_positive_limit(self):
+        for limit, expected in ((100, 12), (0, None), (True, None)):
+            with self.subTest(limit=limit):
+                context = self.response({"success": True, "data": {"limits": [
+                    {"type": "TIME_LIMIT", "currentValue": 12, "usage": limit}]}})
+                with patch.object(host, "open_provider_request", return_value=context):
+                    rows, notice = host.fetch_zcode("test-key")
+                if expected is None:
+                    self.assertIsNone(rows)
+                    self.assertTrue(notice)
+                else:
+                    self.assertIsNone(notice)
+                    self.assertEqual(rows[0]["usedPercent"], expected)
+
     def setUp(self):
         legacy = patch.object(host, 'codex_command', return_value=None)
         legacy.start(); self.addCleanup(legacy.stop)

@@ -35,6 +35,9 @@ static app_settings::NightSettings nightDraft;
 static lv_obj_t *appearanceOverlay = nullptr, *companionPreview = nullptr;
 static lv_obj_t *companionButtons[2] = {}, *companionCaptions[2] = {}, *themeButtons[4] = {}, *themeCaptions[4] = {};
 static lv_obj_t *quotaButton = nullptr, *quotaOverlay = nullptr, *quotaProviderLabel = nullptr, *quotaSelectionLabel = nullptr;
+static lv_obj_t *quotaProviderHelp = nullptr, *quotaSetupHelp = nullptr;
+static lv_obj_t* quotaDetails[4] = {};
+static uint32_t quotaUpdatedAt = 0;
 static lv_obj_t *quotaButtons[4] = {}, *quotaCaptions[4] = {}, *quotaPrev = nullptr, *quotaNext = nullptr;
 static char quotaProviders[8][16] = {};
 static uint8_t quotaProviderCount = 0, quotaProviderIndex = 0, quotaChoiceCount = 0;
@@ -157,10 +160,25 @@ static void theme_select(lv_event_t* event) {
 static void open_appearance(lv_event_t*) { refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
 static void close_appearance(lv_event_t*) { lv_obj_set_hidden(appearanceOverlay, true); }
 
+static void quota_text(lv_obj_t* label, const char* value) {
+  if (strcmp(lv_label_get_text(label), value) != 0) lv_label_set_text(label, value);
+}
+static const aim::ViewData* quota_view(const aim::Snapshot& snapshot, const char* provider) {
+  for (size_t v = 0; v < aim::kMaxViews; ++v) {
+    if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
+    const auto& view = snapshot.views[v];
+    const char* key = view.valid ? view.providerKey : snapshot.viewKeys[v];
+    if (strcmp(key, provider) == 0) return &view;
+  }
+  return nullptr;
+}
 static void refresh_quota_choices() {
+  const auto snapshot = aim::read();
   if (!quotaProviderCount) {
-    lv_label_set_text(quotaProviderLabel, "No providers configured");
-    lv_label_set_text(quotaSelectionLabel, "Connect the host and select providers first.");
+    quota_text(quotaProviderLabel, "No providers configured");
+    quota_text(quotaProviderHelp, "Codex: 5 HOURS / 7 DAYS.\nZCode: 5 HOURS / 7 DAYS / MONTHLY MCP when reported.");
+    quota_text(quotaSelectionLabel, "Choose your AIs in the PC app first.");
+    quota_text(quotaSetupHelp, "Connect USB, select providers in Setup, then Start host.\nTap REFRESH here after connecting.");
     for (auto* button : quotaButtons) lv_obj_set_hidden(button, true);
     lv_obj_set_state(quotaPrev, LV_STATE_DISABLED, true); lv_obj_set_state(quotaNext, LV_STATE_DISABLED, true);
     return;
@@ -168,7 +186,21 @@ static void refresh_quota_choices() {
   const auto* provider = quotaProviders[quotaProviderIndex];
   const auto* style = aim::provider_style(provider);
   const auto saved = app_settings::nova_window(provider);
-  lv_label_set_text(quotaProviderLabel, style ? style->label : provider);
+  const auto* view = quota_view(snapshot, provider);
+  quota_text(quotaProviderLabel, style ? style->label : provider);
+  const bool codex = strcmp(provider, "codex") == 0, zcode = strcmp(provider, "zcode") == 0;
+  const bool claude = strcmp(provider, "claude") == 0, gemini = strcmp(provider, "gemini") == 0;
+  quota_text(quotaProviderHelp, codex ? "5 HOURS = short-term limit. 7 DAYS = weekly limit." :
+      zcode ? "5 HOURS / 7 DAYS = model quota.\nMONTHLY MCP = tool calls, not a monthly token budget." :
+      claude ? "5 HOURS / 7 DAYS come from the optional statusline bridge." :
+      gemini ? "Local token activity only. No account quota is available." :
+      "Shows quota rows supplied by your numeric bridge.\nNo automatic editor account quota is available.");
+  quota_text(quotaSetupHelp, !snapshot.hostPresent ? "Host offline. Open the PC app and Start host." :
+      codex ? "For quota: sign in to Codex with ChatGPT in the PC app.\nTap a window; its percentage is shown on NOVA / ORBIT." :
+      zcode ? "For quota: add your ZAI Coding Plan API key in the PC app.\nOnly windows returned by your plan have a percentage." :
+      claude ? "For quota: install the statusline bridge from Provider setup.\nAn API key alone does not provide subscription quota." :
+      gemini ? "Use Gemini CLI with session recording for local activity.\nQuota options stay unavailable until real data is supplied." :
+      "Set up the external numeric bridge in the PC app.\nLocal token counts are activity, not account quota.");
   lv_obj_set_state(quotaPrev, LV_STATE_DISABLED, quotaProviderCount < 2);
   lv_obj_set_state(quotaNext, LV_STATE_DISABLED, quotaProviderCount < 2);
   int selectedChoice = saved.automatic ? 0 : -1;
@@ -187,7 +219,8 @@ static void refresh_quota_choices() {
     const bool selected = selectedChoice == static_cast<int>(i);
     style_button(quotaButtons[i], selected);
     lv_obj_set_style_text_color(quotaCaptions[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
-    char text[64] = "AUTO / MOST URGENT";
+    char text[96] = "AUTO / MOST URGENT";
+    const auto* row = view && !view->informational ? nova_quota_row(*view, provider, i ? quotaChoices[i - 1] : app_settings::NovaWindow{}) : nullptr;
     if (i) {
       const auto& option = quotaChoices[i - 1];
       char period[36]; quota_window_label(option.minutes, option.title, period, sizeof(period));
@@ -197,32 +230,62 @@ static void refresh_quota_choices() {
       if (duplicateDuration) snprintf(text, sizeof(text), "%s / %s", period, option.title);
       else snprintf(text, sizeof(text), "%s", period);
     }
-    lv_label_set_text(quotaCaptions[i], text);
+    quota_text(quotaCaptions[i], text);
+    if (row) {
+      const float remaining = view->showsRemaining ? row->usedPercent : 100.0f - row->usedPercent;
+      const char* state = !snapshot.hostPresent ? "OFFLINE" : view->notice ? "ERROR" : view->fetching ? "UPDATING" :
+          millis() - view->quotaReceivedMs >= 300000u ? "STALE" : "REPORTED";
+      snprintf(text, sizeof(text), "%.0f%% left / %s", static_cast<double>(remaining), state);
+    } else snprintf(text, sizeof(text), "%s", i ? "NOT REPORTED / can select" : "Lowest remaining quota");
+    quota_text(quotaDetails[i], text);
+    lv_obj_set_style_text_color(quotaDetails[i], lv_color_hex(selected ? ui_theme::background : ui_theme::muted), 0);
   }
   char current[36], text[160]; quota_window_label(saved.minutes, saved.title, current, sizeof(current));
-  if (!quotaChoiceCount) snprintf(text, sizeof(text), "No quota windows reported. Activity-only providers keep their local display.");
+  if (!quotaChoiceCount) snprintf(text, sizeof(text), "No quota windows reported. Local activity only.");
   else snprintf(text, sizeof(text), "Selected: %s%s", saved.automatic ? "AUTO / MOST URGENT" : current,
-                selectedChoice >= 0 ? "" : " / not currently reported");
-  lv_label_set_text(quotaSelectionLabel, text);
+                !saved.automatic && (!view || view->informational || !nova_quota_row(*view, provider, saved)) ? " / not currently reported" : "");
+  quota_text(quotaSelectionLabel, text);
+}
+static void add_quota_choice(uint32_t minutes, const char* title) {
+  if (quotaChoiceCount >= 3) return;
+  for (size_t i = 0; i < quotaChoiceCount; ++i)
+    if (quotaChoices[i].minutes == minutes && strcmp(quotaChoices[i].title, title) == 0) return;
+  auto& choice = quotaChoices[quotaChoiceCount++]; choice = app_settings::NovaWindow{};
+  choice.automatic = false; choice.minutes = minutes;
+  snprintf(choice.title, sizeof(choice.title), "%s", title);
 }
 static void load_quota_choices() {
   quotaChoiceCount = 0;
   if (quotaProviderCount) {
     const auto snapshot = aim::read();
-    for (size_t v = 0; v < aim::kMaxViews; ++v) {
-      if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
-      const auto& view = snapshot.views[v];
-      if (!view.hasUsage || strcmp(view.providerKey, quotaProviders[quotaProviderIndex]) != 0) continue;
-      for (size_t r = 0; r < view.rowCount && r < aim::kMaxRows && quotaChoiceCount < 3; ++r) {
-        const auto& row = view.rows[r]; if (!row.valid || !row.title[0]) continue;
-        bool duplicate = false;
-        for (size_t i = 0; i < quotaChoiceCount; ++i)
-          duplicate |= quotaChoices[i].minutes == row.windowMinutes && strcmp(quotaChoices[i].title, row.title) == 0;
-        if (duplicate) continue;
-        auto& choice = quotaChoices[quotaChoiceCount++]; choice = app_settings::NovaWindow{};
-        choice.automatic = false; choice.minutes = row.windowMinutes;
-        snprintf(choice.title, sizeof(choice.title), "%s", row.title);
+    const auto* provider = quotaProviders[quotaProviderIndex];
+    const auto* view = quota_view(snapshot, provider);
+    const bool modelWindows = strcmp(provider, "codex") == 0 || strcmp(provider, "claude") == 0 || strcmp(provider, "zcode") == 0;
+    if (modelWindows) {
+      const uint32_t periods[] = {300, 10080, 43200};
+      const char* titles[] = {"Session", "Week", "Monthly MCP"};
+      const size_t count = strcmp(provider, "zcode") == 0 ? 3 : 2;
+      for (size_t p = 0; p < count; ++p) {
+        if (view && view->hasUsage) for (size_t r = 0; r < view->rowCount && r < aim::kMaxRows; ++r) {
+          const auto& row = view->rows[r];
+          if (row.valid && row.title[0] && row.windowMinutes == periods[p]) add_quota_choice(row.windowMinutes, row.title);
+        }
       }
+      // Retain nonstandard reported rows before filling unused slots with
+      // expected windows. Never replace real quotas with explanatory options.
+      if (view && view->hasUsage) for (size_t r = 0; r < view->rowCount && r < aim::kMaxRows; ++r) {
+        const auto& row = view->rows[r];
+        if (row.valid && row.title[0]) add_quota_choice(row.windowMinutes, row.title);
+      }
+      for (size_t p = 0; p < count; ++p) {
+        bool present = false;
+        for (size_t i = 0; i < quotaChoiceCount; ++i) present |= quotaChoices[i].minutes == periods[p];
+        if (!present) add_quota_choice(periods[p], titles[p]);
+      }
+    }
+    if (view && view->hasUsage) for (size_t r = 0; r < view->rowCount && r < aim::kMaxRows; ++r) {
+      const auto& row = view->rows[r];
+      if (row.valid && row.title[0]) add_quota_choice(row.windowMinutes, row.title);
     }
   }
   refresh_quota_choices();
@@ -254,6 +317,15 @@ static void open_quota(lv_event_t*) {
   // Freeze option identities while the overlay is open. Incoming API row
   // reordering must not change the meaning of a button during a touch.
   load_quota_choices(); lv_obj_move_foreground(quotaOverlay); lv_obj_set_hidden(quotaOverlay, false);
+}
+static void refresh_quota(lv_event_t*) {
+  char previous[16] = {};
+  if (quotaProviderCount) snprintf(previous, sizeof(previous), "%s", quotaProviders[quotaProviderIndex]);
+  open_quota(nullptr);
+  for (size_t i = 0; i < quotaProviderCount; ++i) if (strcmp(quotaProviders[i], previous) == 0) {
+    quotaProviderIndex = static_cast<uint8_t>(i); load_quota_choices(); break;
+  }
+  aim::request_refresh();
 }
 
 static void refresh_warning_target();
@@ -382,7 +454,7 @@ void ui_settings_init() {
   lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_scrollable(header, false);
   make_label(header, 24, 12, 420, "AI MONITOR / DISPLAY " FW_VERSION, &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_label(header, 24, 34, 500, "Display settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  make_label(header, 24, 34, 500, "Settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   alertsButton = make_button(header, 608, 16, 168, "ALERTS", open_alerts, nullptr);
 
   auto* card = lv_obj_create(settingsScreen);
@@ -433,7 +505,7 @@ void ui_settings_init() {
   make_button(settingsScreen, 24, 424, 152, "<  BACK", back_cb, nullptr);
   nightButton = make_button(settingsScreen, 200, 424, 176, "NIGHT MODE", open_night, nullptr);
   make_button(settingsScreen, 392, 424, 176, "APPEARANCE", open_appearance, nullptr);
-  quotaButton = make_button(settingsScreen, 592, 424, 184, "QUOTA WINDOW", open_quota, nullptr);
+  quotaButton = make_button(settingsScreen, 592, 424, 184, "AI USAGE", open_quota, nullptr);
   lastDimChoice = lastPresetValue = 255;
   refresh_brightness();
   alertsOverlay = lv_obj_create(lv_layer_top());
@@ -529,21 +601,31 @@ void ui_settings_init() {
   lv_obj_set_style_bg_opa(quotaOverlay, LV_OPA_80, 0); lv_obj_set_style_border_width(quotaOverlay, 0, 0);
   lv_obj_set_style_pad_all(quotaOverlay, 0, 0); lv_obj_set_scrollable(quotaOverlay, false);
   auto* quotaCard = lv_obj_create(quotaOverlay);
-  lv_obj_set_pos(quotaCard, 24, 54); lv_obj_set_size(quotaCard, 752, 374);
+  lv_obj_set_pos(quotaCard, 24, 24); lv_obj_set_size(quotaCard, 752, 432);
   lv_obj_set_style_bg_color(quotaCard, lv_color_hex(ui_theme::surface), 0);
   lv_obj_set_style_border_color(quotaCard, lv_color_hex(ui_theme::border), 0);
   lv_obj_set_style_pad_all(quotaCard, 0, 0); lv_obj_set_scrollable(quotaCard, false);
-  make_label(quotaCard, 24, 18, 700, "Companion quota windows", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
-  quotaPrev = make_button(quotaCard, 24, 72, 96, "< PREV", quota_provider_cb, reinterpret_cast<void*>(-1));
-  quotaNext = make_button(quotaCard, 632, 72, 96, "NEXT >", quota_provider_cb, reinterpret_cast<void*>(1));
-  quotaProviderLabel = make_label(quotaCard, 132, 84, 484, "", &lv_font_montserrat_20, ui_theme::text, LV_TEXT_ALIGN_CENTER);
-  for (size_t i = 0; i < 4; ++i)
-    quotaButtons[i] = make_button(quotaCard, 24 + (i % 2) * 360, 138 + (i / 2) * 64, 344, "",
+  make_label(quotaCard, 24, 16, 700, "AI usage settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  quotaPrev = make_button(quotaCard, 24, 58, 96, "< PREV", quota_provider_cb, reinterpret_cast<void*>(-1));
+  quotaNext = make_button(quotaCard, 632, 58, 96, "NEXT >", quota_provider_cb, reinterpret_cast<void*>(1));
+  quotaProviderLabel = make_label(quotaCard, 132, 70, 484, "", &lv_font_montserrat_20, ui_theme::text, LV_TEXT_ALIGN_CENTER);
+  quotaProviderHelp = make_label(quotaCard, 24, 116, 704, "", &lv_font_montserrat_16, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  for (size_t i = 0; i < 4; ++i) {
+    quotaButtons[i] = make_button(quotaCard, 24 + (i % 2) * 360, 164 + (i / 2) * 72, 344, "",
                                   quota_select_cb, reinterpret_cast<void*>(i), &quotaCaptions[i]);
-  quotaSelectionLabel = make_label(quotaCard, 24, 272, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_label(quotaCard, 24, 310, 510, "Alerts still watch all windows. Applies to NOVA and ORBIT.",
-             &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_button(quotaCard, 552, 310, 176, "DONE", close_quota, nullptr);
+    lv_obj_set_height(quotaButtons[i], 64);
+    lv_obj_set_align(quotaCaptions[i], LV_ALIGN_TOP_LEFT);
+    lv_obj_set_pos(quotaCaptions[i], 4, 9); lv_obj_set_width(quotaCaptions[i], 336);
+    lv_obj_set_height(quotaCaptions[i], 24); lv_obj_set_style_text_font(quotaCaptions[i], &lv_font_montserrat_20, 0);
+    lv_label_set_long_mode(quotaCaptions[i], LV_LABEL_LONG_MODE_DOTS);
+    quotaDetails[i] = make_label(quotaButtons[i], 4, 36, 336, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
+  }
+  quotaSelectionLabel = make_label(quotaCard, 24, 314, 704, "", &lv_font_montserrat_18, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  quotaSetupHelp = make_label(quotaCard, 24, 340, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(quotaCard, 24, 386, 400, "NOVA + ORBIT show quota remaining.\nAlerts still check every window.",
+             &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_button(quotaCard, 440, 382, 136, "REFRESH", refresh_quota, nullptr);
+  make_button(quotaCard, 592, 382, 136, "DONE", close_quota, nullptr);
   lv_obj_set_hidden(quotaOverlay, true);
   ui_theme::watch(settingsScreen); refresh_appearance();
   saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
@@ -565,6 +647,11 @@ static void refresh_brightness() {
 }
 
 void ui_settings_update() {
+  // Refresh percentages/availability without moving or rebinding touch targets.
+  // New option identities are loaded only on explicit REFRESH/provider change.
+  if (!lv_obj_is_hidden(quotaOverlay) && millis() - quotaUpdatedAt >= 500u) {
+    quotaUpdatedAt = millis(); refresh_quota_choices();
+  }
   const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay);
   if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
   const int x = choosing ? 48 : 590, y = choosing ? 446 : 406;

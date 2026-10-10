@@ -19,7 +19,7 @@ Tap **SET**, then **APPEARANCE**. Select NOVA or ORBIT and a Forest/Ocean/Amethy
 
 ## Everyday use
 
-For NOVA/ORBIT percentages, open **SET > QUOTA WINDOW**. Select a provider with PREV/NEXT, then its quota window. Codex normally reports **5 HOURS / 7 DAYS**; ZCode lists **5 HOURS / MONTHLY** when those rows are available. **AUTO / MOST URGENT** keeps the most urgent window visible. Each provider's choice is saved independently on the display. Missing selected windows show unavailable; activity-only providers keep LOCAL. Warnings still monitor all quota windows.
+For NOVA/ORBIT percentages, open **SET > AI USAGE**. Select an AI with PREV/NEXT, then its window. Each option shows remaining quota and data status; the page includes provider setup instructions. Codex has **5 HOURS / 7 DAYS**. ZCode can report **5 HOURS / 7 DAYS** for models and **MONTHLY MCP** for tool calls. Monthly MCP is not a monthly token budget. Known missing windows can be selected, but show **NOT REPORTED** until real data arrives. **AUTO / MOST URGENT** follows the most urgent quota. **REFRESH** reloads available options and requests a host update. Each AI's choice is saved independently; activity-only providers keep LOCAL and alerts still monitor all windows.
 
 Double-click **AI-Monitor.exe**, click **Start host**, then close the window. Use **Stop host** before flashing. The **Activity** and **Host log** tabs show connection messages. The NOVA caption reports readable local token sources; it does not invent activity.
 

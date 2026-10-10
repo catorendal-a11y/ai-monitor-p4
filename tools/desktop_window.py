@@ -25,7 +25,7 @@ from board_profiles import BOARDS, get_board
 from host_security import safe_text
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 
-APP_VERSION = 'v1.16.0'
+APP_VERSION = 'v1.16.1'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''

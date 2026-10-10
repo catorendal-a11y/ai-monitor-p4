@@ -399,22 +399,40 @@ def fetch_zcode(api_key):
         limits = ((data.get("data") or {}).get("limits")) or []
         rows = []
         for lim in limits:
-            # Current API: CREDIT_LIMIT with unit 3 = 5h window, unit 6 = monthly.
-            # (Older clients saw TOKENS_LIMIT; accept both.)
-            if lim.get("type") not in ("CREDIT_LIMIT", "TOKENS_LIMIT"):
+            quota_type = lim.get("type")
+            if quota_type not in ("CREDIT_LIMIT", "TOKENS_LIMIT", "TIME_LIMIT"):
                 continue
             unit = lim.get("unit")
-            if unit == 6:
-                title, minutes = "Monthly", 43200
-            elif unit == 3:
-                title, minutes = "Session", 300
+            # The provider's official usage plugin distinguishes monthly MCP
+            # calls (TIME_LIMIT) from model quotas. Unit 6 is a weekly model
+            # window, not a month; unit 3 is hours (normally number=5).
+            if quota_type == "TIME_LIMIT":
+                title, minutes = "Monthly MCP", 43200
+            elif type(unit) is int and unit in (3, 6):
+                number = lim.get("number", 5 if unit == 3 else 1)
+                if type(number) is not int or number < 1:
+                    raise ValueError("Invalid quota window length")
+                minutes = number * (60 if unit == 3 else 10080)
+                if minutes > 0xffffffff:
+                    raise ValueError("Invalid quota window length")
+                title = "Session" if minutes == 300 else "Week" if minutes == 10080 else "Quota"
+            elif quota_type == "TOKENS_LIMIT" and unit is None:
+                title, minutes = "Session", 300  # legacy official plugin format
             else:
                 title, minutes = "Quota", 0
+            percentage = lim.get("percentage")
+            if percentage is None and quota_type == "TIME_LIMIT":
+                used, total = lim.get("currentValue"), lim.get("usage")
+                if (type(used) not in (int, float) or type(total) not in (int, float)
+                        or not math.isfinite(used) or not math.isfinite(total)
+                        or used < 0 or total <= 0):
+                    raise ValueError("Invalid MCP quota counts")
+                percentage = 100 * used / total
             reset = lim.get("nextResetTime") or lim.get("resetAt")
             reset_iso = zai_reset_iso(reset)
             rows.append({
                 "title": title,
-                "usedPercent": percent_value(lim.get("percentage")),
+                "usedPercent": percent_value(percentage),
                 "resetsAt": reset_iso,
                 "windowMinutes": minutes,
             })
