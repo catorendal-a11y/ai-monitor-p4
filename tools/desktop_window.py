@@ -1,0 +1,601 @@
+"""Native Qt control panel with the original NOVA artwork and a bounded log view."""
+from __future__ import annotations
+
+from contextlib import redirect_stdout
+from datetime import datetime
+import io
+import os
+from pathlib import Path
+import sys
+import time
+
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal
+from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap, QShortcut, QKeySequence
+from PySide6.QtCore import QUrl
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame,
+    QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
+    QTabWidget, QVBoxLayout, QWidget,
+)
+
+import aim_control as control
+import desktop_support as desktop
+from board_profiles import BOARDS, get_board
+from host_security import safe_text
+from provider_catalog import PROVIDERS
+
+APP_VERSION = 'v1.14.0'
+ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
+
+STYLE = '''
+QWidget { background: #101b22; color: #e8f0f2; font-family: "Segoe UI"; font-size: 14px; }
+QFrame#sidebar { background: #132b28; border-right: 1px solid #294139; }
+QFrame#card { background: #182831; border: 1px solid #2b414b; border-radius: 12px; }
+QLabel { background: transparent; border: none; }
+QLabel#muted { color: #b3c4cd; }
+QLabel#eyebrow { color: #70e6ae; font-weight: 600; font-size: 12px; }
+QLabel#headline { font-size: 27px; font-weight: 600; }
+QLabel#brand { font-size: 25px; font-weight: 700; letter-spacing: 2px; }
+QLabel#metric { font-size: 20px; font-weight: 600; }
+QLabel#warning { color: #ffcf86; }
+QPushButton { background: #273c47; border: 1px solid #41606d; border-radius: 8px;
+              padding: 10px 16px; font-weight: 600; min-height: 20px; }
+QPushButton:hover { background: #324f5c; border-color: #7ab8cf; }
+QPushButton:focus { border: 2px solid #c8fff0; }
+QPushButton#primary { background: #35c987; color: #071c12; border-color: #35c987; }
+QPushButton#primary:hover { background: #72e6b0; }
+QPushButton:disabled { color: #a5b5bd; background: #20303a; border-color: #30444e; }
+QLineEdit, QComboBox, QSpinBox { background: #0c161d; border: 1px solid #4b6875;
+                              border-radius: 7px; padding: 8px; min-height: 22px; }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 2px solid #70e6ae; }
+QComboBox QAbstractItemView { background: #182831; selection-background-color: #285742; }
+QCheckBox { spacing: 10px; padding: 5px 0; background: transparent; }
+QCheckBox:focus { background: #25453e; border-radius: 5px; }
+QCheckBox::indicator { width: 20px; height: 20px; background: #0c161d;
+                       border: 1px solid #6b8996; border-radius: 4px; }
+QCheckBox::indicator:checked { image: url(CHECK_IMAGE); border-color: #70e6ae; }
+QTabWidget::pane { border: none; }
+QTabBar::tab { background: #182831; padding: 10px 17px; border-radius: 5px; margin-right: 5px; }
+QTabBar::tab:selected { background: #2b5143; color: #baffdb; }
+QPlainTextEdit { background: #080f14; color: #b3e8d4; border: 1px solid #304651;
+                 border-radius: 8px; padding: 9px; selection-background-color: #375949; }
+QProgressBar { border: none; background: #263c46; height: 5px; border-radius: 2px; }
+QProgressBar::chunk { background: #35c987; }
+QScrollArea { border: none; }
+QScrollBar:vertical { background: #14232b; width: 12px; }
+QScrollBar::handle:vertical { background: #4c6873; border-radius: 4px; min-height: 24px; }
+'''
+
+
+def label(text: str, style: str = '', wrap: bool = False) -> QLabel:
+    widget = QLabel(text)
+    widget.setTextFormat(Qt.TextFormat.PlainText)
+    widget.setObjectName(style)
+    widget.setWordWrap(wrap)
+    return widget
+
+
+class WorkerSignals(QObject):
+    output = Signal(str)
+    finished = Signal(bool, str)
+
+
+class ActionWorker(QRunnable):
+    def __init__(self, action, name: str):
+        super().__init__()
+        self.action, self.name = action, name
+        self.signals = WorkerSignals()
+
+    def run(self):
+        capture = io.StringIO()
+        try:
+            # A single action worker is allowed. Backend console messages are
+            # captured, while the UI itself emits through Qt signals only.
+            with redirect_stdout(capture):
+                self.action(self.signals.output.emit)
+            for line in capture.getvalue().splitlines():
+                self.signals.output.emit(safe_text(line))
+            self.signals.finished.emit(True, self.name + ' complete.')
+        except control.SetupError as error:
+            self.signals.finished.emit(False, safe_text(str(error)))
+        except Exception:
+            # Exceptions from credentials, subprocesses or APIs may contain
+            # private input. Never forward their raw text or traceback.
+            self.signals.finished.emit(False, self.name + ' failed. Check settings and the USB connection.')
+
+
+class FirmwareDialog(QDialog):
+    def __init__(self, board_id: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Prepare display firmware')
+        self.setMinimumWidth(570)
+        layout = QVBoxLayout(self)
+        layout.addWidget(label(get_board(board_id).name, 'metric', True))
+        self.kind = QComboBox()
+        self.kind.addItem('First installation — resets display settings', 'install')
+        self.kind.addItem('Update this project\'s existing installation', 'update')
+        self.kind.setAccessibleName('Firmware operation')
+        layout.addWidget(self.kind)
+        layout.addWidget(label('For a factory demo or a different project, use First installation. '
+                               'An update requires the existing AI Monitor partition layout.', 'muted', True))
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
+class ConfirmFlashDialog(QDialog):
+    def __init__(self, board_id: str, port: str, kind: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Confirm verified firmware write')
+        self.setMinimumWidth(580)
+        layout = QVBoxLayout(self)
+        board = get_board(board_id)
+        layout.addWidget(label('Review before writing', 'headline'))
+        layout.addWidget(label(f'Board: {board.name}\nChip: {board.chip}\nUSB port: {port}\n'
+                               f'Operation: {"First installation" if kind == "install" else "Application update"}', wrap=True))
+        if board.experimental:
+            layout.addWidget(label('EXPERIMENTAL S3 — not verified on physical hardware. Use USB TO UART.', 'warning', True))
+        layout.addWidget(label('Firmware hashes, chip headers and image layout passed verification. '
+                               'First installation resets display settings. Keep power connected until completion.', 'muted', True))
+        prompt = label('Type FLASH to enable the write button:')
+        self.confirm = QLineEdit()
+        self.confirm.setAccessibleName('Type FLASH to confirm')
+        prompt.setBuddy(self.confirm)
+        layout.addWidget(prompt)
+        layout.addWidget(self.confirm)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        self.write = buttons.addButton('Write firmware', QDialogButtonBox.ButtonRole.AcceptRole)
+        self.write.setEnabled(False)
+        self.confirm.textChanged.connect(lambda text: self.write.setEnabled(text.strip() == 'FLASH'))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
+class MonitorWindow(QMainWindow):
+    def __init__(self, root: Path = control.ROOT, monitor: bool = True):
+        super().__init__()
+        self.root = root
+        self.busy = False
+        self.unsaved = False
+        self.worker = None
+        self.secrets = []
+        self.previous_log = None
+        self.token_reporter = None
+        self.config = desktop.load_settings(root)
+        self._remember_secrets()
+        self.pool = QThreadPool(self)
+        self.pool.setMaxThreadCount(1)
+        self.setWindowTitle('AI Monitor — NOVA desktop companion')
+        self.setWindowIcon(QIcon(str(ASSETS / 'nova-icon.png')))
+        self.resize(1200, 900)
+        self.setMinimumSize(1040, 760)
+        self.setStyleSheet(STYLE.replace('CHECK_IMAGE', (ASSETS/'checked.png').as_posix()))
+        self.ready_image = QPixmap(str(ASSETS / 'nova-done.png'))
+        self.work_image = QPixmap(str(ASSETS / 'nova-work.png'))
+        self._build()
+        self._load_fields()
+        self.append_output('Welcome. Choose your board and AI providers, then save settings.')
+        self.append_output('The monitor reads usage records and quota status. It does not generate AI requests.')
+        shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
+        shortcut.activated.connect(self.save)
+        self.timer = QTimer(self)
+        self.timer.setInterval(2500)
+        self.timer.timeout.connect(self.refresh_status)
+        if monitor:
+            self.refresh_status()
+            self.timer.start()
+
+    def _remember_secrets(self):
+        for value in (self.config.get('zai_key', ''), os.environ.get('ZAI_API_KEY', '')):
+            if value and value not in self.secrets:
+                self.secrets.append(value)
+        self.secrets = self.secrets[-8:]
+
+    def _build(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QHBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        sidebar = QFrame()
+        sidebar.setObjectName('sidebar')
+        sidebar.setFixedWidth(280)
+        left = QVBoxLayout(sidebar)
+        left.setContentsMargins(24, 28, 24, 28)
+        left.setSpacing(16)
+        left.addWidget(label('AI MONITOR', 'brand'))
+        left.addWidget(label('YOUR AI, AT A GLANCE', 'eyebrow'))
+        left.addStretch(1)
+        self.nova = QLabel()
+        self.nova.setAccessibleName('NOVA robot companion')
+        self.nova.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.nova.setMinimumHeight(174)
+        left.addWidget(self.nova)
+        left.addWidget(label('NOVA', 'headline'))
+        left.addWidget(label('A little companion for the work\nhappening on your PC.', 'muted', True))
+        self.host_state = label('HOST STOPPED', 'eyebrow')
+        left.addWidget(self.host_state)
+        self.token_state = label('Waiting for selected token sources.', 'muted', True)
+        left.addWidget(self.token_state)
+        left.addStretch(2)
+        left.addWidget(label('LOCAL RECORDS + USB\nClose this window and your\nhost keeps running.', 'muted', True))
+        left.addWidget(label(APP_VERSION, 'eyebrow'))
+        layout.addWidget(sidebar)
+
+        right = QVBoxLayout()
+        right.setContentsMargins(28, 26, 28, 24)
+        right.setSpacing(15)
+        layout.addLayout(right, 1)
+        heading = QHBoxLayout()
+        titles = QVBoxLayout()
+        titles.addWidget(label('Your desk companion', 'headline'))
+        titles.addWidget(label('Set up your display. Start the host. Let NOVA follow your work.', 'muted', True))
+        heading.addLayout(titles, 1)
+        heading.addWidget(label('USB COMPANION', 'eyebrow'))
+        right.addLayout(heading)
+        actions = QHBoxLayout()
+        self.save_button = self._button('&Save settings', self.save, primary=True)
+        self.start_button = self._button('&Start host', self.start, primary=True)
+        self.stop_button = self._button('S&top host', self.stop)
+        self.integration_button = self._button('Provider set&up', self.integrations)
+        actions.addWidget(self.save_button)
+        actions.addWidget(self.start_button)
+        actions.addWidget(self.stop_button)
+        actions.addWidget(self.integration_button)
+        right.addLayout(actions)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.hide()
+        right.addWidget(self.progress)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._setup_tab(), 'Setup')
+        self.tabs.addTab(self._firmware_tab(), 'Firmware')
+        self.tabs.addTab(self._help_tab(), 'Help')
+        right.addWidget(self.tabs, 1)
+        console_heading = QHBoxLayout()
+        console_heading.addWidget(label('COMPANION TERMINAL', 'eyebrow'))
+        console_heading.addStretch()
+        console_heading.addWidget(label('Read-only activity and connection messages', 'muted'))
+        right.addLayout(console_heading)
+        self.console_tabs = QTabWidget()
+        self.activity = self._console('Application activity')
+        self.host_log = self._console('Host connection log')
+        self.console_tabs.addTab(self.activity, 'Activity')
+        self.console_tabs.addTab(self.host_log, 'Host log')
+        self.console_tabs.setMinimumHeight(145)
+        self.console_tabs.setMaximumHeight(180)
+        right.addWidget(self.console_tabs)
+        self.notice = label('Ready to configure. Nothing starts automatically.', 'muted', True)
+        right.addWidget(self.notice)
+        self._show_robot(False)
+
+    def _button(self, text, callback, primary=False):
+        button = QPushButton(text)
+        if primary:
+            button.setObjectName('primary')
+        button.clicked.connect(callback)
+        return button
+
+    def _console(self, name: str):
+        box = QPlainTextEdit()
+        box.setReadOnly(True)
+        box.setAccessibleName(name)
+        box.setMaximumBlockCount(400)
+        font = QFont('Consolas', 10)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        box.setFont(font)
+        return box
+
+    def _setup_tab(self):
+        content = QWidget()
+        form = QVBoxLayout(content)
+        form.setContentsMargins(0, 15, 0, 0)
+        form.setSpacing(10)
+        form.addWidget(label('DISPLAY AND CONNECTION', 'eyebrow'))
+        fields = QGridLayout()
+        self.board = QComboBox()
+        self.board.setAccessibleName('Display board')
+        self.board.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.board.setMinimumContentsLength(20)
+        self.board.addItem('Choose your display board…', '')
+        for item in BOARDS.values():
+            name = 'Waveshare ESP32-S3 4.3" (experimental)' if item.experimental else 'GUITION ESP32-P4 (JC4880P433)'
+            self.board.addItem(name, item.id)
+            self.board.setItemData(self.board.count() - 1, item.name, Qt.ItemDataRole.ToolTipRole)
+        self.port = QComboBox()
+        self.port.setEditable(True)
+        self.port.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.port.setMinimumContentsLength(7)
+        self.port.setAccessibleName('USB serial port')
+        self.rescan_button = self._button('Rescan USB', self.rescan)
+        fields.addWidget(label('Display board'), 0, 0)
+        fields.addWidget(label('USB port'), 0, 1)
+        fields.addWidget(self.board, 1, 0)
+        port_row = QHBoxLayout()
+        port_row.addWidget(self.port, 1)
+        port_row.addWidget(self.rescan_button)
+        fields.addLayout(port_row, 1, 1)
+        fields.setColumnStretch(0, 3)
+        fields.setColumnStretch(1, 2)
+        form.addLayout(fields)
+        self.board_help = label('', 'muted', True)
+        form.addWidget(self.board_help)
+        form.addWidget(label('CHOOSE YOUR AI PROVIDERS', 'eyebrow'))
+        grid = QGridLayout()
+        self.providers = {}
+        for index, (key, (name, _, support)) in enumerate(PROVIDERS.items()):
+            checkbox = QCheckBox(name)
+            checkbox.setToolTip(support)
+            checkbox.setAccessibleDescription(support)
+            checkbox.toggled.connect(self._changed)
+            grid.addWidget(checkbox, index // 2, index % 2)
+            self.providers[key] = checkbox
+        form.addLayout(grid)
+        form.addWidget(label('Codex, ZCode, Claude and Gemini have local adapters. Other tools need a numeric bridge.', 'muted', True))
+        self.key_row = QWidget()
+        key_layout = QHBoxLayout(self.key_row)
+        key_layout.setContentsMargins(0, 0, 0, 0)
+        self.key = QLineEdit()
+        self.key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key.setAccessibleName('Optional Z.AI API key')
+        self.key.setPlaceholderText('Optional Z.AI key — leave empty to keep your saved key')
+        self.clear_key = QCheckBox('Clear saved key')
+        key_layout.addWidget(self.key, 1)
+        key_layout.addWidget(self.clear_key)
+        form.addWidget(self.key_row)
+        bottom = QHBoxLayout()
+        bottom.addWidget(label('Quota refresh'))
+        self.interval = QSpinBox()
+        self.interval.setRange(15, 240)
+        self.interval.setSuffix(' sec')
+        self.interval.setAccessibleName('Quota refresh interval in seconds')
+        bottom.addWidget(self.interval)
+        bottom.addStretch()
+        bottom.addWidget(label('Status reads only — no model requests', 'muted'))
+        form.addLayout(bottom)
+        form.addStretch()
+        self.board.currentIndexChanged.connect(self._changed)
+        self.port.currentTextChanged.connect(self._changed)
+        self.key.textChanged.connect(self._changed)
+        self.clear_key.toggled.connect(self._changed)
+        self.interval.valueChanged.connect(self._changed)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll
+
+    def _firmware_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 20, 8, 15)
+        layout.addWidget(label('The right image for your board', 'headline'))
+        layout.addWidget(label('Save your board and USB selection in Setup first. '
+                               'The installer checks firmware size, SHA-256, chip headers and factory/application consistency.', 'muted', True))
+        layout.addWidget(label('Waveshare S3 is experimental and targets the original CH422G model only. '
+                               'B/C variants are unsupported. Use USB TO UART. Intermediate dimming is visual.', 'warning', True))
+        self.flash_button = self._button('Install / update &firmware…', self.flash, primary=True)
+        layout.addWidget(self.flash_button)
+        layout.addWidget(label('You will review the exact board, port and operation and type FLASH before writing. '
+                               'The host is stopped only after confirmation. Restart it after flashing.', 'muted', True))
+        layout.addStretch()
+        return widget
+
+    def _help_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 20, 8, 15)
+        layout.addWidget(label('A few useful things to know', 'headline'))
+        layout.addWidget(label('1. Choose the exact display board and at least one AI provider.\n'
+                               '2. Save settings; finish provider setup when required.\n'
+                               '3. Install firmware on a new display, then start the host.\n'
+                               '4. Close this window; the host keeps running in the background.\n\n'
+                               'Token activity starts with a baseline and can lag generation. '
+                               'The monitor does not send prompts to AI models. '
+                               'Your optional API key stays in local tools/aim_host.json; keep it private.', 'muted', True))
+        layout.addWidget(self._button('Open setup guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4/blob/main/docs/QUICK_START.md'))))
+        layout.addWidget(self._button('Open provider guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4/blob/main/docs/PROVIDERS.md'))))
+        layout.addStretch()
+        return widget
+
+    def _load_fields(self):
+        self.board.setCurrentIndex(max(0, self.board.findData(self.config.get('board', ''))))
+        self.rescan()
+        self.port.setCurrentText(self.config['port'])
+        for key, checkbox in self.providers.items():
+            checkbox.setChecked(key in self.config['providers'])
+        self.interval.setValue(self.config['interval_s'])
+        self.unsaved = False
+        self._changed(mark=False)
+        self.notice.setText('Saved setup loaded. Start the host when your display is connected.'
+                            if self.config.get('board') and self.config['providers'] else
+                            'Choose your board and AI providers. Save settings before starting.')
+
+    def _changed(self, *_args, mark=True):
+        self.key_row.setVisible(self.providers['zcode'].isChecked())
+        board_id = self.board.currentData()
+        if board_id == 'waveshare-s3-43':
+            self.board_help.setText('EXPERIMENTAL S3 • original CH422G model • use USB TO UART • visual dimming')
+            self.board_help.setObjectName('warning')
+        elif board_id == 'guition-p4':
+            self.board_help.setText('GUITION JC4880P433 • USB data port • hardware PWM dimming')
+            self.board_help.setObjectName('muted')
+        else:
+            self.board_help.setText('Choose your display. Use a USB data cable and an explicit port when several devices are connected.')
+            self.board_help.setObjectName('muted')
+        if mark:
+            self.unsaved = True
+            self.notice.setText('Unsaved changes — save before starting or preparing firmware.')
+
+    def rescan(self):
+        current = self.port.currentText() or self.config['port']
+        self.port.clear()
+        self.port.addItem('auto')
+        for item in sorted(control.list_ports.comports(), key=lambda p: p.device):
+            self.port.addItem(safe_text(item.device))
+        self.port.setCurrentText(current)
+
+    def _error(self, text: str):
+        self.notice.setText(text)
+        self.append_output(text)
+        QMessageBox.warning(self, 'Check your settings', text)
+
+    def save(self):
+        if self.busy:
+            return
+        previous_providers = self.config['providers']
+        try:
+            self.config = desktop.save_settings(self.root, self.board.currentData(),
+                [key for key, checkbox in self.providers.items() if checkbox.isChecked()],
+                self.port.currentText(), self.interval.value(), self.key.text(), self.clear_key.isChecked())
+        except (control.SetupError, ValueError, OSError):
+            self._error('Choose a supported board, at least one provider and a valid USB port. '
+                        'API keys must be a single printable token. Nothing was saved.')
+            return
+        self._remember_secrets()
+        self.key.clear()
+        self.clear_key.setChecked(False)
+        self.unsaved = False
+        self.token_reporter = None
+        self.notice.setText('Settings saved. Existing keys were preserved unless you explicitly changed or cleared them.')
+        self.append_output('Settings saved. Board: ' + get_board(self.config['board']).name)
+        if 'codex' in self.config['providers'] and 'codex' not in previous_providers:
+            answer = QMessageBox.question(self, 'Finish Codex setup',
+                'Codex is selected. Open the official CLI setup console now? '
+                'Installation and sign-in are offered only when needed.',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if answer == QMessageBox.StandardButton.Yes:
+                self.integrations()
+
+    def _ready(self):
+        if self.unsaved or not self.config.get('board') or not self.config['providers']:
+            self._error('Save your display board and AI providers in Setup first.')
+            return False
+        return not self.busy
+
+    def _run(self, name, action):
+        if self.busy:
+            return
+        self.busy = True
+        for button in (self.start_button, self.stop_button, self.save_button,
+                       self.flash_button, self.integration_button, self.rescan_button):
+            button.setEnabled(False)
+        self.tabs.setEnabled(False)
+        self.progress.show()
+        self.notice.setText(name + '…')
+        self.worker = ActionWorker(action, name)
+        self.worker.signals.output.connect(self.append_output)
+        self.worker.signals.finished.connect(self._finished)
+        self.pool.start(self.worker)
+
+    def _finished(self, success, message):
+        self.busy = False
+        self.progress.hide()
+        self.tabs.setEnabled(True)
+        for button in (self.start_button, self.stop_button, self.save_button,
+                       self.flash_button, self.integration_button, self.rescan_button):
+            button.setEnabled(True)
+        self.notice.setText(message)
+        self.append_output(message)
+        self.worker = None
+        if not success:
+            QMessageBox.warning(self, 'Action could not finish', message)
+        self.refresh_status()
+
+    def start(self):
+        if self._ready():
+            self._run('Starting host', lambda emit: control.start_host(self.root))
+
+    def stop(self):
+        self._run('Stopping host', lambda emit: control.stop_host(self.root))
+
+    def integrations(self):
+        if not self._ready():
+            return
+        try:
+            desktop.open_integrations(self.root)
+            self.append_output('Provider setup opened in its own console. Follow the official sign-in prompts there.')
+        except (control.SetupError, OSError):
+            self._error('Provider setup could not open. Check that the complete package is extracted.')
+
+    def flash(self):
+        if not self._ready():
+            return
+        board_id = self.config['board']
+        operation = FirmwareDialog(board_id, self)
+        if operation.exec() != QDialog.DialogCode.Accepted:
+            return
+        kind = operation.kind.currentData()
+        try:
+            port, _command = desktop.prepare_flash(self.root, board_id, kind)
+        except (control.SetupError, ValueError, OSError):
+            self._error('Firmware verification or USB selection failed. Check the selected board and extract the complete release package.')
+            return
+        confirm = ConfirmFlashDialog(board_id, port, kind, self)
+        if confirm.exec() != QDialog.DialogCode.Accepted or confirm.confirm.text().strip() != 'FLASH':
+            self.append_output('Firmware cancelled. Host and display were not changed.')
+            return
+        self._run('Writing firmware', lambda emit: desktop.write_firmware(self.root, board_id, kind, port, emit))
+
+    def append_output(self, text: str):
+        for secret in self.secrets:
+            text = text.replace(secret, '[REDACTED]')
+        self.activity.appendPlainText(f'[{datetime.now():%H:%M:%S}] {safe_text(text)}')
+
+    def _show_robot(self, working: bool):
+        image = self.work_image if working else self.ready_image
+        self.nova.setPixmap(image.scaled(230, 174, Qt.AspectRatioMode.KeepAspectRatio,
+                                        Qt.TransformationMode.SmoothTransformation))
+
+    def refresh_status(self):
+        try:
+            running = bool(control.owned_hosts(self.root))
+            self.host_state.setText('HOST RUNNING' if running else 'HOST STOPPED')
+            text = desktop.recent_log(self.root, tuple(self.secrets))
+            if text != self.previous_log:
+                scrollbar = self.host_log.verticalScrollBar()
+                follow = scrollbar.value() == scrollbar.maximum()
+                position = scrollbar.value()
+                self.host_log.setPlainText(text or 'No host messages yet. Start the host after saving settings.')
+                scrollbar.setValue(scrollbar.maximum() if follow else position)
+                self.previous_log = text
+            if self.token_reporter is None:
+                self.token_reporter = control.host.TokenReporter(providers=self.config['providers'], activity_dir=self.root/'tools/activity')
+            sample = self.token_reporter.poll()
+            if sample:
+                if not sample['known']:
+                    self.token_state.setText('Waiting for readable token sources.')
+                elif sample['seen']:
+                    self.token_state.setText(f'Last recorded increase: {sample["idleSeconds"]} sec ago')
+                else:
+                    self.token_state.setText('Token sources readable. Baseline established.')
+            working = running and self.token_reporter.last_use is not None and time.monotonic() - self.token_reporter.last_use < 20
+            self._show_robot(working)
+        except (ValueError, OSError):
+            self.token_state.setText('Local status unavailable; check the host log.')
+
+    def closeEvent(self, event):
+        if self.busy:
+            self.notice.setText('Wait for the current action to finish before closing this window.')
+            event.ignore()
+            return
+        self.timer.stop()
+        event.accept()  # The independent background host is deliberately left running.
+
+
+def run_desktop() -> int:
+    application = QApplication.instance() or QApplication(sys.argv[:1])
+    application.setApplicationName('AI Monitor')
+    application.setOrganizationName('AI Monitor contributors')
+    application.setStyle('Fusion')
+    try:
+        window = MonitorWindow()
+    except (ValueError, OSError):
+        QMessageBox.critical(None, 'Configuration unavailable',
+            'Repair the local tools/aim_host.json file or extract a fresh package. Your file was not changed.')
+        return 1
+    window.show()
+    return application.exec()

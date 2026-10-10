@@ -37,3 +37,9 @@ The OpenAI mark originates from the [OpenAI brand archive](https://cdn.openai.co
 OpenAI and ZCode names/logos remain their owners' property. The root MIT license does not grant trademark rights or relicense these marks. They identify displayed providers; no sponsorship or endorsement is implied. Check applicable source and brand terms before reusing or redistributing marks in another product.
 
 Original NOVA and ORBIT artwork is project-owned and covered by MIT. Generated C++ arrays retain this distinction: robot artwork is MIT; embedded provider marks retain their owners' rights.
+
+## Native desktop runtime
+
+The desktop app uses PySide6-Essentials and Shiboken 6.10.2, with Qt 6.10.2 Core/Gui/Widgets/Network, SVG and image-format plugins. These retain their upstream LGPLv3 and third-party terms; they are not relicensed by the project MIT license. License texts are included under licenses/ and in the corresponding-source archives under third-party-source/. Qt/PySide DLLs remain separate and replaceable under _internal/. The included project source and build scripts can rebuild the app against compatible modified libraries; reverse engineering for debugging modifications to those LGPL components is permitted. Windows system libraries and fonts are used from the operating system and are not redistributed as project assets.
+
+The corresponding Qt/PySide source archives are pinned to the upstream 6.10.2 commits and hash-checked during packaging. See scripts/collect_qt_sources.py. Upstream build instructions: https://doc.qt.io/qt-6/build-sources.html and https://doc.qt.io/qtforpython-6/building_from_source/index.html.

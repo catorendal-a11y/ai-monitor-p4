@@ -3,6 +3,7 @@ import argparse
 import hashlib
 from importlib import metadata
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -14,10 +15,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from board_profiles import BOARDS
 from aim_control import firmware_file
+from collect_qt_sources import collect as collect_qt_sources
 
 
 def run(*arguments):
     subprocess.run([sys.executable, *arguments], cwd=ROOT, check=True)
+
+
+def build_desktop(*arguments):
+    # Qt uses Windows' ICU. Unrelated image/PDF tools on the builder's PATH
+    # can make PyInstaller bundle an incompatible ICU with the same DLL name.
+    environment = dict(os.environ)
+    system = Path(os.environ['SystemRoot'])
+    environment['PATH'] = os.pathsep.join([str(Path(sys.executable).parent),
+        str(Path(sys.base_prefix)), str(system / 'System32'), str(system)])
+    subprocess.run([sys.executable, *arguments], cwd=ROOT, env=environment, check=True)
 
 
 def main():
@@ -25,6 +37,7 @@ def main():
     parser.add_argument('--firmware-dir', type=Path, required=True, help='Directory containing both board-specific firmware folders')
     parser.add_argument('--output', type=Path, default=ROOT / 'work/windows-release')
     parser.add_argument('--executables-dir', type=Path, help='Reuse executables already built from the same reviewed source')
+    parser.add_argument('--qt-source-dir', type=Path, help='Reuse hash-verified corresponding-source archives')
     args = parser.parse_args()
     if sys.platform != 'win32':
         parser.error('Windows executables must be built on Windows.')
@@ -40,16 +53,31 @@ def main():
     package.mkdir()
     scratch = ROOT / 'work/windows-build'
     scratch.mkdir(parents=True, exist_ok=True)
-    common = ['-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--console',
+    common = ['-m', 'PyInstaller', '--noconfirm', '--clean',
               '--distpath', str(package), '--workpath', str(scratch / 'build'), '--specpath', str(scratch)]
     if args.executables_dir:
-        for name in ('AI-Monitor.exe', 'firmware-flasher.exe'):
+        for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe'):
             shutil.copy2(args.executables_dir / name, package / name)
+        shutil.copytree(args.executables_dir / '_internal', package / '_internal')
     else:
-        run(*common, '--name', 'AI-Monitor', '--paths', str(ROOT / 'tools'), '--exclude-module', 'esptool',
+        gui_dist = scratch / 'desktop-dist'
+        build_desktop(*common, '--distpath', str(gui_dist), '--onedir', '--windowed', '--name', 'AI-Monitor',
+            '--paths', str(ROOT / 'tools'), '--exclude-module', 'esptool',
+            '--icon', str(ROOT / 'assets/desktop/nova.ico'),
+            '--add-data', str(ROOT / 'assets/desktop') + os.pathsep + 'assets/desktop',
+            str(ROOT / 'tools/aim_desktop.py'))
+        shutil.copytree(gui_dist / 'AI-Monitor', package, dirs_exist_ok=True)
+        run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Console', '--paths', str(ROOT / 'tools'),
+            '--exclude-module', 'esptool', '--exclude-module', 'PySide6',
             str(ROOT / 'tools/aim_control.py'))
-        run(*common, '--name', 'firmware-flasher', '--collect-all', 'esptool', '--collect-all', 'esp_pylib',
+        run(*common, '--onefile', '--console', '--name', 'firmware-flasher', '--exclude-module', 'PySide6',
+            '--collect-all', 'esptool', '--collect-all', 'esp_pylib',
             str(ROOT / 'scripts/esptool_entry.py'))
+    if (package / '_internal/icuuc.dll').exists():
+        raise RuntimeError('Unexpected bundled ICU: use a clean builder PATH; Qt requires the Windows system ICU')
+    # A windowed executable can start and still fail to import Qt. This exact
+    # packaged application must complete its synthetic GUI check before export.
+    subprocess.run([str(package / 'AI-Monitor.exe'), '--gui-check'], cwd=package, check=True, timeout=30)
     files = subprocess.check_output(['git', '-C', str(ROOT), 'ls-files'], text=True).splitlines()
     # Export reviewed source; never recursively copy runtime/private directories.
     for name in files:
@@ -112,6 +140,7 @@ def main():
     sources = package / 'third-party-source'
     sources.mkdir()
     run('-m', 'pip', 'download', '--no-deps', '--no-binary=:all:', '--dest', str(sources), 'esptool==5.4.0')
+    collect_qt_sources(sources, args.qt_source_dir)
     hashes = []
     for path in sorted(package.rglob('*')):
         if path.is_file():

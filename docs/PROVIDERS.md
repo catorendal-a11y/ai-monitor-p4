@@ -1,6 +1,6 @@
 # Choose your AI providers
 
-First-time setup has **no preselected AI**. Choose one or more numbered providers explicitly. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
+First-time setup has **no preselected AI**. Check one or more providers explicitly in the desktop app, or use the numbered console choices. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
 
 ## What each choice supports
 
@@ -15,15 +15,15 @@ First-time setup has **no preselected AI**. Choose one or more numbered provider
 | Antigravity | Numeric telemetry bridge | No automatic quota adapter | Supply numeric telemetry. The CLI's interactive quota panel is not treated as a stable machine API. |
 | OpenCode | Numeric telemetry bridge | No automatic quota adapter | Export cumulative token usage from an SDK integration you control. |
 
-The menu lists these limitations alongside each provider, before selection. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
+The graphical app exposes these limitations in each provider's tooltip; the console menu also lists them. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
 
 ## Claude Code
 
 Local activity uses assistant `message.usage` numeric fields from recent default CLI transcripts under `~/.claude/projects/`. Records with the same `message.id` are not counted twice; increases in a streamed record may still be registered later. Inputs, outputs and reported cache tokens are observed counts, not an invoice. CLI versions may omit or incompletely report output usage. Desktop/web sessions have separate storage and are not automatically covered.
 
-For quota display, choose **7 - Provider integration help**, then type **INSTALL** for the optional statusline bridge. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
+For quota display, click **Provider setup** (or choose **7** in AI-Monitor-Console.exe), then type **INSTALL** for the optional statusline bridge. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
 
-If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `AI-Monitor.exe --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an installed bridge, restore the backed-up Claude settings or remove only the inserted statusLine entry.
+If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `AI-Monitor-Console.exe --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an installed bridge, restore the backed-up Claude settings or remove only the inserted statusLine entry.
 
 Primary references: [Claude statusline fields](https://code.claude.com/docs/en/statusline), [CLI session storage](https://code.claude.com/docs/en/sessions), [usage monitoring](https://code.claude.com/docs/en/monitoring-usage). The numeric transcript adapter uses a version-sensitive local format; unsupported records remain unavailable.
 
@@ -38,7 +38,7 @@ Primary references: [recorded sessions](https://geminicli.com/docs/cli/session-m
 Cursor, Copilot, Antigravity and OpenCode can be selected, but need an external integration that reports usage. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the portable executable, for example:
 
 ```text
-AI-Monitor.exe --ingest copilot
+AI-Monitor-Console.exe --ingest copilot
 ```
 
 Input:

@@ -10,7 +10,9 @@
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/token_activity.py`: read-only numeric token activity.
-- `tools/aim_control.py`: local setup, scoped host controls and verified firmware installation.
+- `tools/aim_control.py`: console setup, scoped host controls and verified firmware installation.
+- `tools/aim_desktop.py`, `tools/desktop_window.py`, `tools/desktop_support.py`: graphical NOVA control panel and validated actions. Qt mutations stay on the main thread; blocking actions use one worker.
+- Desktop tests use an offscreen Qt window with synthetic configuration, without provider requests or hardware writes.
 - `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
 - `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.
 - `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.

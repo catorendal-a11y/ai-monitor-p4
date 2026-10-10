@@ -4,12 +4,12 @@
 
 Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** on this repository and download **ai-monitor-p4-v1.13.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
-2. Right-click the ZIP and choose **Extract All**. Keep the entire folder together in a writable location, such as Documents. Do not run it inside the ZIP.
+1. Open **Releases** on this repository and download **ai-monitor-p4-v1.14.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
+2. Right-click the ZIP and choose **Extract All**. Keep the entire folder, including **_internal**, together in a writable location, such as Documents. Do not run it inside the ZIP.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
-4. Choose **1 â€” First-time setup**. Choose your exact display board, then explicitly select the AI providers you use; neither choice is preselected on a fresh installation. Then select the display's USB port. The optional Z.AI key is requested only if you choose ZCode. See [provider-specific setup](PROVIDERS.md) for Claude and other choices. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.
-5. For a new board, choose **4 â€” Install / update display firmware**, then **1 â€” First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Existing P4 firmware v1.12.0+ can use the new host without flashing. A new S3 board must receive the S3 factory installation.**
-6. Choose **2 â€” Start host**. The companion runs in the background. Close the menu; keep the display connected. NOVA appears on the display when the host connects.
+4. In **Setup**, choose your board, providers and USB port, then click **Save settings**. Choose your exact display board, then explicitly select the AI providers you use; neither choice is preselected on a fresh installation. Then select the display's USB port. The optional Z.AI key is requested only if you choose ZCode. See [provider-specific setup](PROVIDERS.md) for Claude and other choices. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.
+5. For a new board, open **Firmware > Install / update firmware**, then choose **First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Existing P4 firmware v1.12.0+ can use the new host without flashing. A new S3 board must receive the S3 factory installation.**
+6. Click **Start host**. The companion runs in the background. Close the window; keep the display connected. NOVA appears on the display when the host connects.
 
 When you choose Codex, setup offers the official CLI installer and its sign-in flow automatically when needed. Accept the offered steps with your own account; [Codex setup guide](CODEX_SETUP.md). Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).
 
@@ -19,15 +19,15 @@ Tap **SET**, then **APPEARANCE**. Select NOVA or ORBIT and a Forest/Ocean/Amethy
 
 ## Everyday use
 
-Double-click **AI-Monitor.exe**, choose **2 â€” Start host**, then close the menu. Choose **3 â€” Stop host** before disconnecting for flashing. Choose **5 â€” Status** or **6 â€” View recent log** when a connection fails.
+Double-click **AI-Monitor.exe**, click **Start host**, then close the window. Use **Stop host** before flashing. The **Activity** and **Host log** tabs show connection messages. The NOVA caption reports readable local token sources; it does not invent activity.
 
-For firmware upgrades, choose **4**, then **2 â€” Update existing installation**. This writes the application and retains settings only when the board already uses this project's partition layout. For a different project's firmware, use First installation.
+For firmware upgrades, open **Firmware**, then select **Update this project's existing installation**. This writes the application and retains settings only when the board already uses this project's partition layout. For a different project's firmware, use First installation.
 
 Copy the new package into a new folder, stop the old host, and run setup in the new folder. If desired, copy your private `tools/aim_host.json` from the old folder into the new one before setup. Do not share this file. The portable package cannot automatically stop hosts belonging to a different extracted folder.
 
 ## Downloaded the source ZIP instead?
 
-Source code needs **Python 3.10+** and internet access for first setup. On Windows, install Python from [python.org](https://www.python.org/downloads/windows/), extract the source ZIP and double-click **AI-Monitor.bat**. It creates `.venv`, installs the small host dependencies and opens the same menu. Existing local configuration is preserved. Source ZIPs contain no prebuilt firmware or portable executables; use the Windows release for firmware installation, or the [developer guide](DEVELOPMENT.md) to build it.
+Source code needs **Python 3.10+** and internet access for first setup. On Windows, install Python from [python.org](https://www.python.org/downloads/windows/), extract the source ZIP and double-click **AI-Monitor.bat**. It creates `.venv`, installs the host/Qt dependencies and opens the same graphical app. Existing local configuration is preserved. Source ZIPs contain no prebuilt firmware or portable executables; use the Windows release for firmware installation, or the [developer guide](DEVELOPMENT.md) to build it.
 
 On Linux/macOS:
 
@@ -44,6 +44,7 @@ The source menu can configure and start/stop the companion. A Windows portable p
 | --- | --- |
 | Connected display does not match selected board | Open First-time setup and select the actual model. P4 and S3 use separate firmware. |
 | S3 screen looks darker but LEDs stay bright | Intermediate brightness is visual attenuation; only zero switches the original S3 backlight off. |
+| Desktop runtime could not load | Extract the complete ZIP into a new folder; keep _internal beside AI-Monitor.exe. Do not copy the EXE alone. |
 | No USB port | Use a data-capable cable, the board's USB data port, and reconnect. Close other serial tools. |
 | Several COM ports | Unplug the display, reopen setup and compare the list after reconnecting. Select its numbered port explicitly. |
 | Codex quota unavailable | Sign in with Codex CLI, then use Status to check whether its login file is present. |

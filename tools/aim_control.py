@@ -56,7 +56,16 @@ def save_config(config, root=ROOT):
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             json.dump(config, output, indent=2)
             output.write("\n")
-        os.replace(temporary, path)
+        for attempt in range(4):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError as error:
+                # Windows scanners can briefly hold the existing config open.
+                # Retain atomic replacement; never relax file permissions.
+                if getattr(error, 'winerror', None) not in (5, 32) or attempt == 3:
+                    raise
+                time.sleep(0.025 * (2 ** attempt))
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -150,14 +159,14 @@ def configure(root=ROOT, ask=input, read_secret=getpass.getpass):
 
 def owned_hosts(root=ROOT):
     expected = {(root / "tools/aim_host.py").resolve(), (root / "tools/aim_control.py").resolve()}
-    portable = (root / "AI-Monitor.exe").resolve()
+    portable = {(root / name).resolve() for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe')}
     found = []
     for process in psutil.process_iter(["pid", "cmdline", "exe"]):
         try:
             if process.pid == os.getpid():
                 continue
             command = process.info.get("cmdline") or []
-            if "--host" in command and process.info.get("exe") and Path(process.info["exe"]).resolve() == portable:
+            if "--host" in command and process.info.get("exe") and Path(process.info["exe"]).resolve() in portable:
                 found.append(process)
                 continue
             for argument in command[1:]:
@@ -193,7 +202,8 @@ def start_host(root=ROOT):
     get_board(config['board'])
     stop_host(root)
     if getattr(sys, "frozen", False):
-        command = [sys.executable, "--host"]
+        helper = root / 'AI-Monitor-Console.exe'
+        command = [str(helper) if helper.is_file() else sys.executable, "--host"]
     else:
         python = Path(sys.executable)
         pythonw = python.with_name("pythonw.exe")
@@ -369,6 +379,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", action="store_true", help="Run the background companion")
     parser.add_argument("--check", action="store_true", help="Show local diagnostics without connecting to the panel or API")
+    parser.add_argument('--integrations', action='store_true', help='Open selected provider integrations interactively')
     parser.add_argument('--ingest', choices=list(PROVIDERS), help='Read a cumulative numeric telemetry record from stdin')
     parser.add_argument('--claude-statusline', action='store_true', help='Receive documented Claude statusline quota fields')
     args = parser.parse_args(argv)
@@ -387,6 +398,16 @@ def main(argv=None):
         return host.main()
     if args.check:
         status()
+        return 0
+    if args.integrations:
+        try:
+            integration_help()
+        except (ValueError, RuntimeError, OSError):
+            print('Provider setup could not finish. Check your selected providers and official CLI installation.')
+        try:
+            input('Press Enter to close provider setup: ')
+        except (EOFError, KeyboardInterrupt):
+            pass
         return 0
     actions = {"1": configure, "2": start_host, "3": stop_host, "4": flash, "5": status, "6": view_log, '7': integration_help}
     while True:

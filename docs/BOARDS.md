@@ -1,6 +1,6 @@
 # Choose your display board
 
-One repository and one Windows package contain two separate firmware builds. Open **1 - First-time setup** and choose the exact board before choosing AI providers. New installations have no board or AI provider preselected. Existing configurations without a `board` field retain the original P4 target.
+One repository and one Windows package contain two separate firmware builds. Open **Setup** in the desktop app and choose the exact board before choosing AI providers, then save settings. New installations have no board or AI provider preselected. Existing configurations without a `board` field retain the original P4 target.
 
 | Board | Status | Screen | Host connection | Build environment |
 | --- | --- | --- | --- | --- |
@@ -14,7 +14,7 @@ Both builds use LVGL 9.6 and the same dashboard, provider choices, NOVA/ORBIT ar
 ## Waveshare S3 setup
 
 1. Connect a data cable to **USB TO UART**. Use this connector for both firmware installation and everyday host operation. The board's native USB connector is not the AI Monitor transport in this build.
-2. Open First-time setup, choose **Waveshare ESP32-S3-Touch-LCD-4.3 (experimental)**, select your AI providers and the UART COM port. Install the manufacturer's CH343 driver if Windows does not list the bridge.
+2. Open Setup, choose **Waveshare ESP32-S3 4.3" (experimental)**, select your AI providers and the UART COM port, then save settings. Install the manufacturer's CH343 driver if Windows does not list the bridge.
 3. Open Install / update firmware and check the selected board again. Use **First installation** when replacing the manufacturer's demo or another project's firmware. Type `FLASH` only after checking the board and port.
 4. Start the host. If normal flashing cannot connect, follow Waveshare's BOOT/RESET recovery instructions for this exact model. Stop the host and close serial monitors before flashing.
 

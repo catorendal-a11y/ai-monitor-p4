@@ -38,17 +38,25 @@ The S3 target is the original CH422G model, **not B or C**. [Board compatibility
 
 The Windows package includes the Python runtime, PC companion, firmware flasher and prebuilt firmware. You do not need to install development tools. Linux/macOS users can run the companion from source.
 
+## A graphical PC companion
+
+Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program icon, board/provider controls and a terminal-style activity log. Save settings, start/stop the hidden host, or open the Firmware tab to install the verified board-specific image. The window reads local status; it does not generate AI prompts.
+
+![AI Monitor desktop app with NOVA, setup controls and terminal-style logs](docs/media/desktop-app.png)
+
+*Actual desktop app rendered with synthetic saved settings. Fresh installations have no board or provider preselected.*
+
 ## Get running on Windows
 
-1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest) and download **ai-monitor-p4-v1.13.0-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
+1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest) and download **ai-monitor-p4-v1.14.0-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
-3. **Choose your board and AI tools.** Select **1 - First-time setup**, choose P4 or S3, then choose one or more providers, then select the display's USB port. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
-4. **Prepare the display.** On a new board, choose **4 - Install / update display firmware**, then **1 - First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
-5. **Start the companion.** Select **2 - Start host**. Close the menu; the host keeps running invisibly while the display remains connected.
+3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
+4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
+5. **Start the companion.** Click **Start host**. Close the window; the host keeps running invisibly while the display remains connected.
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity; flashing is optional for P4. A new S3 board requires its own first installation.
 
-**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.13.0/ai-monitor-p4-v1.13.0-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.13.0/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
+**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.14.0/ai-monitor-p4-v1.14.0-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.14.0/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
 
 GitHub's **Source code (zip)** download contains source only; it does not include the portable programs or prebuilt firmware.
 
@@ -60,7 +68,7 @@ Token activity and account quota are separate signals. A provider can animate th
 | --- | --- | --- |
 | **Codex** | Local Codex database | Signed-in official Codex CLI; setup offers installation/sign-in. |
 | **ZCode** | Local ZCode database | Your optional Z.AI coding-plan API key. |
-| **Claude Code** | Local CLI usage records | Optional documented statusline bridge, offered in menu 7. |
+| **Claude Code** | Local CLI usage records | Optional documented statusline bridge, offered in Provider setup. |
 | **Gemini CLI** | Recorded local CLI sessions | Activity only; automatic account quota is unavailable. |
 | **GitHub Copilot** | External numeric bridge | Activity only; editor usage is not imported automatically. |
 | **Cursor** | External numeric bridge | Activity only. |
@@ -69,7 +77,7 @@ Token activity and account quota are separate signals. A provider can animate th
 
 **External bridge** means you must connect an integration that supplies cumulative token counts. Selecting that provider alone does not enable automatic tracking. See [provider requirements and bridge examples](docs/PROVIDERS.md).
 
-Codex setup uses the official client and your own sign-in flow; the monitor does not ask for an OpenAI password or key. Existing CLI installations and account storage are reused. You can decline installation/sign-in and finish later with **7 - Provider integration help**. [Codex setup guide](docs/CODEX_SETUP.md).
+Codex setup uses the official client and your own sign-in flow; the monitor does not ask for an OpenAI password or key. Existing CLI installations and account storage are reused. You can decline installation/sign-in and finish later with **Provider setup**. [Codex setup guide](docs/CODEX_SETUP.md).
 
 ## Make it yours
 
@@ -89,15 +97,16 @@ The display also includes reset countdowns, manual refresh, low/critical quota w
 
 ## Everyday use
 
-| Menu choice | What it does |
+| Control | What it does |
 | --- | --- |
-| **1 - First-time setup** | Select display board, providers, USB port and optional provider configuration. |
-| **2 - Start host** | Start this folder's companion in the background. |
-| **3 - Stop host** | Stop hosts belonging to this folder. |
-| **4 - Install / update firmware** | Verify the selected board, chip and firmware hashes before confirming a flash. |
-| **5 - Status** | Inspect host status, USB ports and readable token sources without making API calls. |
-| **6 - View recent log** | Show recent connection and polling messages. |
-| **7 - Provider integration help** | Retry Codex setup or configure the optional Claude quota bridge. |
+| **Setup / Save settings** | Choose board, providers and port; preserve saved keys unless explicitly changed. |
+| **Start host / Stop host** | Manage only this folder's independent background companion. |
+| **Provider setup** | Open official Codex onboarding or the optional Claude bridge in its console. |
+| **Firmware** | Review the selected board, chip and verified image before typing FLASH. |
+| **Activity / Host log** | Read bounded local messages; API keys and control sequences are filtered. |
+| **Help** | Open setup/provider guides. |
+
+Advanced command-line use remains available through **AI-Monitor-Console.exe**. Keep the **_internal** folder beside the graphical executable.
 
 When upgrading, stop the old host before opening a newly extracted package. To preserve configuration, privately copy `tools/aim_host.json` into the new folder before setup. [Upgrade instructions](docs/QUICK_START.md#everyday-use).
 
@@ -108,8 +117,8 @@ The robot follows **increases in recorded token counters**. The first sample est
 | Symptom | First check |
 | --- | --- |
 | No USB connection | Use a data cable and the correct USB port; close other serial tools. |
-| Robot does not react | Open Status and check that the selected provider has a readable token source. |
-| Codex quota is unavailable | Use menu 7 to finish official CLI sign-in; account quota requires a supported ChatGPT-backed login. |
+| Robot does not react | Check NOVA's token-source caption and the Host log, or run AI-Monitor-Console.exe --check. |
+| Codex quota is unavailable | Use Provider setup to finish official CLI sign-in; account quota requires a supported ChatGPT-backed login. |
 | External provider stays inactive | Connect its numeric telemetry bridge; selection alone does not supply data. |
 
 This is an activity and quota display, not a billing ledger or per-token stream. Unsupported local formats remain unavailable. Display history clears after a firmware restart. [More troubleshooting](docs/QUICK_START.md#if-something-does-not-work).

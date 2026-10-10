@@ -6,7 +6,7 @@ The portable Windows archive lets users run the companion and flash the display 
 
 1. Push the reviewed, credential-free repository to your GitHub repository. Do not copy local configurations, logs or unrelated output files.
 2. Ensure Actions is enabled. Set `FW_VERSION` to the intended version and pass CI. Commit before tagging.
-3. Create and push a tag matching `FW_VERSION`, such as `v1.13.0`. This explicitly starts the Portable Windows release workflow.
+3. Create and push a tag matching `FW_VERSION`, such as `v1.14.0`. This explicitly starts the Portable Windows release workflow.
 4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables and creates a **draft release** containing the Windows ZIP and its SHA-256 checksum. Drafts are invisible to ordinary downloaders.
 5. Download the draft ZIP, extract it on Windows, test the menu, setup and firmware on the target board, and verify no private files are included. Review license notices and the corresponding upstream source.
 6. Publish the reviewed draft using GitHub's Releases UI. README's recommended download is available after publication.
@@ -40,6 +40,8 @@ The package requires both `work/prebuilt/guition-p4/` and `work/prebuilt/wavesha
 .\.venv\Scripts\python.exe scripts/build_windows_release.py --firmware-dir work/prebuilt
 ```
 
-The script builds `AI-Monitor.exe` and a separate upstream `firmware-flasher.exe`, exports tracked source, adds the matching images/manifest, gathers dependency licenses and esptool source, then creates the ZIP and internal file hashes in `work/windows-release`. It rejects an existing package directory so an old configuration cannot be silently mixed into a new release. Python/PlatformIO are needed only by the builder, not by the recipient of the portable ZIP.
+The script builds a windowed `AI-Monitor.exe` with its replaceable `_internal` Qt runtime, a separate `AI-Monitor-Console.exe` for background/stdin workflows, and upstream `firmware-flasher.exe`, exports tracked source, adds the matching images/manifest, gathers dependency licenses and pinned esptool/Qt/PySide corresponding source, then creates the ZIP and internal file hashes in `work/windows-release`. It rejects an existing package directory so an old configuration cannot be silently mixed into a new release. Python/PlatformIO are needed only by the builder, not by the recipient of the portable ZIP.
+
+The desktop build uses a clean PATH to avoid unrelated ICU DLLs. An unexpected bundled ICU aborts packaging; the exact windowed EXE must pass --gui-check before archiving. The native desktop tests use synthetic settings and never flash or log into a real account.
 
 Tagging/publishing is a maintainer action. Preparing an archive locally does not upload it to GitHub.
