@@ -131,10 +131,6 @@ def configure(root=ROOT, ask=input, read_secret=getpass.getpass):
     config = local_config(root)
     config['board'] = choose_board(config.get('board', ''), ask)
     board = get_board(config['board'])
-    validate_options(config)
-    if type(config['interval_s']) is not int or not 15 <= config['interval_s'] <= 240:
-        raise SetupError('Quota refresh must be between 15 and 240 seconds. Save settings before starting.')
-    host.credential(os.environ.get('ZAI_API_KEY', config['zai_key']), optional=True)
     if board.experimental:
         print('S3: use the USB TO UART connector for flashing AND host data. Native USB is not this transport.')
         print('Brightness is visual dimming; the physical backlight supports on/off. RGB/touch need hardware verification.')
@@ -205,6 +201,10 @@ def start_host(root=ROOT):
     if not config.get('board'):
         raise SetupError('Choose your display board in First-time setup before starting the host.')
     board = get_board(config['board'])
+    validate_options(config)
+    if type(config['interval_s']) is not int or not 15 <= config['interval_s'] <= 240:
+        raise SetupError('Quota refresh must be between 15 and 240 seconds. Save settings before starting.')
+    host.credential(os.environ.get('ZAI_API_KEY', config['zai_key']), optional=True)
     if config['port'] == 'auto':
         try:
             candidates = sorted({serial_port(port.device) for port in list_ports.comports()

@@ -113,7 +113,7 @@ class HostSettingsTests(unittest.TestCase):
         self.assertEqual(read_status(self.root, {os.getpid()})['providers']['codex'], 'unavailable')
 
     def test_invalid_start_preferences_cannot_replace_working_host(self):
-        control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['gemini'], token_poll_s=False), self.root)
+        control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['gemini'], port='COM9999', token_poll_s=False), self.root)
         with patch.object(control, 'stop_host') as stop, patch.object(control.subprocess, 'Popen') as spawn:
             with self.assertRaises(ValueError): control.start_host(self.root)
         stop.assert_not_called(); spawn.assert_not_called()
@@ -125,4 +125,3 @@ class HostSettingsTests(unittest.TestCase):
         with patch.dict(os.environ, {'LOCALAPPDATA': str(self.root), 'CODEX_INSTALL_DIR': '', 'APPDATA': str(self.root)}), \
              patch.object(codex, 'path_executable', return_value=None):
             self.assertEqual(codex.codex_command(), [str(executable)])
-
