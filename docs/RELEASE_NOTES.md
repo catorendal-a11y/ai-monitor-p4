@@ -1,4 +1,4 @@
-# AI Monitor v1.16.1 (unreleased)
+# AI Monitor v1.16.1
 
 - **SET > AI USAGE** explains each provider's quota windows and PC setup. Each choice shows remaining quota and REPORTED/NOT REPORTED/OFFLINE/ERROR/UPDATING/STALE status.
 - Known windows can be selected while waiting for data, without fabricated percentages. Live values update in Settings without rebinding touch targets; REFRESH reloads choices explicitly.
