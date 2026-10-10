@@ -16,13 +16,17 @@ def main():
             window = MonitorWindow(Path(directory), monitor=False)
             valid = not window.nova.pixmap().isNull() and not window.windowIcon().isNull()
             window.close()
+        if getattr(sys, 'frozen', False):
+            from desktop_support import check_flasher_runtime
+            if not check_flasher_runtime(aim_control.ROOT):
+                return 1
         return 0 if valid else 1
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1:] != ['--firmware']:
         # Keep read-only diagnostics compatible with old shortcuts. Interactive
         # integrations and stdin telemetry use AI-Monitor-Console.exe.
         return aim_control.main(sys.argv[1:])
     from desktop_window import run_desktop
-    return run_desktop()
+    return run_desktop(firmware='--firmware' in sys.argv[1:])
 
 
 if __name__ == '__main__':

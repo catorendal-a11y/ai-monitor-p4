@@ -1,15 +1,15 @@
 # Download, connect, run
 
-## Recommended: portable Windows package
+## Recommended: Windows installer
 
 Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** on this repository and download **ai-monitor-p4-v1.14.0-windows.zip**. Choose this asset, rather than GitHub's automatic **Source code (zip)**.
-2. Right-click the ZIP and choose **Extract All**. Keep the entire folder, including **_internal**, together in a writable location, such as Documents. Do not run it inside the ZIP.
+1. Open **Releases** and download **AI-Monitor-Setup-v1.15.0-windows.exe**. It installs the complete app for your user and opens setup. No administrator access or separate Python installation is required. The release is unsigned; [read the Windows trust notes](WINDOWS_TRUST.md) if SmartScreen warns.
+2. For a portable installation instead, download **ai-monitor-p4-v1.15.0-windows.zip** and use **Extract All**. Keep the entire folder, including **_internal**, together. Do not run inside the ZIP. GitHub's **Source code (zip)** contains no ready-to-run programs.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
-4. In **Setup**, choose your board, providers and USB port, then click **Save settings**. Choose your exact display board, then explicitly select the AI providers you use; neither choice is preselected on a fresh installation. Then select the display's USB port. The optional Z.AI key is requested only if you choose ZCode. See [provider-specific setup](PROVIDERS.md) for Claude and other choices. Enter preserves existing settings/keys; `clear` removes a saved Z.AI key. Keys are entered without echoing them to the screen.
-5. For a new board, open **Firmware > Install / update firmware**, then choose **First installation**. Check the board and port, and type `FLASH` when ready. This installs the firmware and resets display settings. **Existing P4 firmware v1.12.0+ can use the new host without flashing. A new S3 board must receive the S3 factory installation.**
-6. Click **Start host**. The companion runs in the background. Close the window; keep the display connected. NOVA appears on the display when the host connects.
+4. In **Setup**, choose your exact board, providers and USB port. Read the visible instructions for each AI. Codex offers official CLI setup/sign-in; ZCode quota needs your own Z.AI Coding Plan key in the masked field. Without that key, ZCode can still report local activity. Click **Save settings**. A blank key field preserves the saved key; **Clear saved key** removes it. Neither board nor AI is preselected on a fresh installation.
+5. For a new board, open **Firmware > Install / update firmware** and choose **First installation**. Review the board/port and type `FLASH`. This resets display settings. For an existing AI Monitor, choose **Update this project's existing installation** to retain settings and enable the new quota selector/large alerts. A new S3 board needs its own factory installation. Progress and errors remain in **Activity**; keep the app and power connected until it finishes.
+6. Leave **Start the host after a successful firmware installation** checked, or click **Start host** afterward. Once running, close the window and keep the display connected. The host stays invisible until Stop host, sign-out or shutdown.
 
 When you choose Codex, setup offers the official CLI installer and its sign-in flow automatically when needed. Accept the offered steps with your own account; [Codex setup guide](CODEX_SETUP.md). Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).
 
@@ -18,6 +18,8 @@ When you choose Codex, setup offers the official CLI installer and its sign-in f
 Tap **SET**, then **APPEARANCE**. Select NOVA or ORBIT and a Forest/Ocean/Amethyst/Ember theme. Use DONE, then BACK. Choices are stored on the display and survive application updates/reboots. A first factory installation resets device settings. If SAVE FAILED appears, the selection is temporary; retry before restarting.
 
 ## Everyday use
+
+For NOVA/ORBIT percentages, open **SET > QUOTA WINDOW**. Select a provider with PREV/NEXT, then its quota window. Codex normally reports **5 HOURS / 7 DAYS**; ZCode lists **5 HOURS / MONTHLY** when those rows are available. **AUTO / MOST URGENT** keeps the most urgent window visible. Each provider's choice is saved independently on the display. Missing selected windows show unavailable; activity-only providers keep LOCAL. Warnings still monitor all quota windows.
 
 Double-click **AI-Monitor.exe**, click **Start host**, then close the window. Use **Stop host** before flashing. The **Activity** and **Host log** tabs show connection messages. The NOVA caption reports readable local token sources; it does not invent activity.
 
@@ -45,6 +47,8 @@ The source menu can configure and start/stop the companion. A Windows portable p
 | Connected display does not match selected board | Open First-time setup and select the actual model. P4 and S3 use separate firmware. |
 | S3 screen looks darker but LEDs stay bright | Intermediate brightness is visual attenuation; only zero switches the original S3 backlight off. |
 | Desktop runtime could not load | Extract the complete ZIP into a new folder; keep _internal beside AI-Monitor.exe. Do not copy the EXE alone. |
+| Flasher closes when double-clicked | Open AI-Monitor.exe > Firmware. The new helper explains this and offers to open the Firmware tab. |
+| Windows says unknown publisher | This release is unsigned. Keep Windows protection enabled; see WINDOWS_TRUST.md. |
 | No USB port | Use a data-capable cable, the board's USB data port, and reconnect. Close other serial tools. |
 | Several COM ports | Unplug the display, reopen setup and compare the list after reconnecting. Select its numbered port explicitly. |
 | Codex quota unavailable | Sign in with Codex CLI, then use Status to check whether its login file is present. |

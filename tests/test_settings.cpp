@@ -5,6 +5,11 @@
 static unsigned failures = 0;
 #define CHECK(value) do { if (!(value)) { ++failures; std::cerr << __LINE__ << ": " #value "\n"; } } while (false)
 
+static app_settings::NovaWindow manual_window(uint32_t minutes, const char* title) {
+  app_settings::NovaWindow value; value.automatic = false; value.minutes = minutes;
+  snprintf(value.title, sizeof(value.title), "%s", title); return value;
+}
+
 int main() {
   using namespace app_settings;
   Preferences legacy;
@@ -23,6 +28,50 @@ int main() {
   CHECK(appearance().companion == Companion::orbit && appearance().theme == Theme::ocean);
   fake_nvs::values["appear_v1"] = {255,255}; s_loaded = false;
   CHECK(appearance().companion == Companion::nova && appearance().theme == Theme::forest);
+  CHECK(nova_window("codex").automatic && nova_window("zcode").automatic);
+  set_nova_window("codex", manual_window(300, "Session"));
+  set_nova_window("zcode", manual_window(43200, "Monthly"));
+  CHECK(nova_window("codex").minutes == 300 && nova_window("zcode").minutes == 43200);
+  CHECK(nova_window("claude").automatic);
+  CHECK(fake_nvs::values["nova_win_v1"].size() == kNovaWindowBytes);
+  const auto windowWrites = fake_nvs::writes;
+  set_nova_window("zcode", manual_window(43200, "Monthly"));
+  CHECK(fake_nvs::writes == windowWrites);
+  fake_nvs::fail_write = true;
+  set_nova_window("codex", manual_window(10080, "Week"));
+  CHECK(save_status() == SaveStatus::failed && nova_window("codex").minutes == 10080);
+  s_loaded = false; CHECK(nova_window("codex").minutes == 300);  // failed write did not persist
+  fake_nvs::fail_write = false;
+  set_nova_window("codex", manual_window(10080, "Week"));
+  CHECK(save_status() == SaveStatus::saved);
+  s_loaded = false;
+  CHECK(nova_window("codex").minutes == 10080 && nova_window("zcode").minutes == 43200);
+  CHECK(std::strcmp(nova_window("codex").title, "Week") == 0);
+  fake_nvs::fail_open = true;
+  set_nova_window("claude", manual_window(300, "Session")); CHECK(save_status() == SaveStatus::failed);
+  fake_nvs::fail_open = false;
+  set_nova_window("claude", manual_window(300, "Session")); CHECK(save_status() == SaveStatus::saved);
+  const auto validWindows = fake_nvs::values["nova_win_v1"];
+  fake_nvs::values["nova_win_v1"][0] = 255; s_loaded = false;
+  CHECK(nova_window("codex").automatic && nova_window("zcode").minutes == 43200);
+  fake_nvs::values["nova_win_v1"] = validWindows;
+  fake_nvs::values["nova_win_v1"][5] = 1; s_loaded = false;
+  CHECK(nova_window("codex").automatic);
+  fake_nvs::values["nova_win_v1"] = validWindows;
+  fake_nvs::values["nova_win_v1"][40] = 'x'; s_loaded = false;
+  CHECK(nova_window("codex").automatic);  // unterminated stored title rejected
+  fake_nvs::values["nova_win_v1"] = {1, 2}; s_loaded = false;
+  CHECK(nova_window("codex").automatic && nova_window("zcode").automatic);
+  fake_nvs::values["nova_win_v1"] = validWindows; s_loaded = false;
+  set_nova_window("codex", NovaWindow{}); s_loaded = false;
+  CHECK(nova_window("codex").automatic && nova_window("zcode").minutes == 43200);
+  const auto validWriteCount = fake_nvs::writes;
+  set_nova_window("unknown", manual_window(300, "Session")); CHECK(save_status() == SaveStatus::failed);
+  set_nova_window(nullptr, manual_window(300, "Session")); CHECK(save_status() == SaveStatus::failed);
+  set_nova_window("codex", manual_window(300, "")); CHECK(save_status() == SaveStatus::failed);
+  auto invalidWindow = manual_window(300, "Session"); invalidWindow.title[35] = 'x';
+  set_nova_window("codex", invalidWindow); CHECK(save_status() == SaveStatus::failed);
+  CHECK(fake_nvs::writes == validWriteCount && nova_window("unknown").automatic);
   fake_nvs::fail_open = true;
   set_dim_minutes(1); CHECK(save_status() == SaveStatus::failed);
   CHECK(dim_minutes() == 1);  // temporary setting remains usable

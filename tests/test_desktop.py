@@ -83,6 +83,15 @@ class DesktopSettingsTests(unittest.TestCase):
                 desktop.write_firmware(Path('.'), 'waveshare-s3-43', 'install', 'COM6', Mock())
         stop.assert_not_called(); spawn.assert_not_called()
 
+    def test_application_update_requires_verified_panel_before_flashing(self):
+        panel=Mock(); panel.heartbeat.side_effect=RuntimeError('synthetic wrong board')
+        with patch.object(desktop, 'prepare_flash', return_value=('COM7', ['flasher'])), \
+                patch.object(control, 'stop_host'), patch.object(control.host, 'Panel', return_value=panel), \
+                patch.object(desktop.time, 'sleep'), patch.object(desktop.subprocess, 'Popen') as spawn:
+            with self.assertRaises(control.SetupError):
+                desktop.write_firmware(Path('.'), 'waveshare-s3-43', 'update', 'COM7', Mock())
+        panel.close.assert_called_once(); spawn.assert_not_called()
+
     def test_console_host_is_owned_only_with_the_scoped_host_argument(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
@@ -147,6 +156,39 @@ class DesktopWindowTests(unittest.TestCase):
         with patch.object(control,'start_host') as start, patch.object(QMessageBox,'warning'):
             self.window.start()
         start.assert_not_called()
+
+    def test_each_provider_has_visible_setup_instructions(self):
+        from provider_catalog import PROVIDER_SETUP, PROVIDERS
+        self.assertEqual(set(PROVIDER_SETUP), set(PROVIDERS))
+        for key in PROVIDERS:
+            self.window.providers[key].setChecked(True)
+            self.assertEqual(self.window.provider_guide.currentData(), key)
+            self.assertIn('1.', self.window.provider_instructions.text())
+            self.assertIn('2.', self.window.provider_instructions.text())
+            self.assertTrue(self.window.provider_link.isEnabled())
+        self.window.provider_guide.setCurrentIndex(self.window.provider_guide.findData('zcode'))
+        self.assertIn('API key', self.window.provider_instructions.text())
+        self.assertTrue(self.window.key_row.isVisible())
+        self.window.providers['zcode'].setChecked(False)
+        self.assertFalse(self.window.key_row.isVisible())
+
+    def test_flash_starts_host_only_after_success_and_keeps_log_visible(self):
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['gemini'].setChecked(True); self.window.save()
+        operation=Mock(); operation.exec.return_value=QDialog.DialogCode.Accepted
+        operation.kind.currentData.return_value='update'; operation.start_after.isChecked.return_value=True
+        confirm=Mock(); confirm.exec.return_value=QDialog.DialogCode.Accepted; confirm.confirm.text.return_value='FLASH'
+        with patch('desktop_window.FirmwareDialog', return_value=operation), \
+                patch('desktop_window.ConfirmFlashDialog', return_value=confirm), \
+                patch.object(desktop, 'prepare_flash', return_value=('COM7', ['tool'])), \
+                patch.object(desktop, 'write_firmware') as write, patch.object(control, 'start_host') as start, \
+                patch.object(self.window, '_run') as action:
+            self.window.flash()
+            callback=action.call_args.args[1]; callback(Mock())
+            write.assert_called_once(); start.assert_called_once_with(self.root)
+            write.side_effect=control.SetupError('synthetic USB failure'); start.reset_mock()
+            with self.assertRaises(control.SetupError): callback(Mock())
+            start.assert_not_called()
 
     def test_flash_confirmation_requires_exact_text(self):
         dialog=ConfirmFlashDialog('waveshare-s3-43','COM7','install')

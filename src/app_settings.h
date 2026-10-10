@@ -34,6 +34,13 @@ inline Appearance normalize_appearance(Appearance value) {
 }
 Appearance appearance();
 void set_appearance(Appearance value);
+// One independent NOVA/ORBIT quota-window preference per provider.
+struct NovaWindow { bool automatic = true; uint32_t minutes = 0; char title[36] = {}; };
+inline constexpr const char* nova_window_keys[] = {
+  "codex", "zcode", "claude", "gemini", "copilot", "cursor", "antigravity", "opencode"
+};
+NovaWindow nova_window(const char* provider);
+void set_nova_window(const char* provider, NovaWindow value);
 inline const char* companion_name(Companion value) { return value == Companion::orbit ? "ORBIT" : "NOVA"; }
 inline const char* theme_name(Theme value) {
   static const char* names[] = {"Forest", "Ocean", "Amethyst", "Ember"};

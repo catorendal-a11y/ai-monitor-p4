@@ -19,6 +19,29 @@ static NightSettings s_night;
 static uint8_t s_savedDim = 5, s_savedWarning = 25;
 static NightSettings s_savedNight;
 static Appearance s_appearance, s_savedAppearance;
+static constexpr size_t kNovaWindowBytes = 8 * 41;
+static NovaWindow s_novaWindows[8], s_savedNovaWindows[8];
+static int nova_provider_index(const char* key) {
+  if (!key) return -1;
+  for (size_t i = 0; i < 8; ++i) if (strcmp(key, nova_window_keys[i]) == 0) return static_cast<int>(i);
+  return -1;
+}
+static bool valid_nova_window(const NovaWindow& value) {
+  if (value.automatic) return true;
+  if (!value.title[0] || value.title[35]) return false;
+  for (const char* p = value.title; *p; ++p) if (*p < 32 || *p > 126) return false;
+  return true;
+}
+static void encode_nova_windows(const NovaWindow (&values)[8], uint8_t (&bytes)[kNovaWindowBytes]) {
+  memset(bytes, 0, sizeof(bytes));
+  for (size_t i = 0; i < 8; ++i) {
+    const auto& value = values[i]; auto* cell = bytes + i * 41;
+    if (value.automatic) continue;
+    cell[0] = 1;
+    for (unsigned b = 0; b < 4; ++b) cell[b + 1] = static_cast<uint8_t>(value.minutes >> (b * 8));
+    memcpy(cell + 5, value.title, 36);
+  }
+}
 struct WarningRule {
   char provider[16] = {}, title[36] = {};
   uint32_t window = 0;
@@ -57,11 +80,25 @@ static void ensure_loaded() {
         if (!aim::provider_style(rule.provider) || rule.percent < 5 || rule.percent > 50) rule = WarningRule{};
       }
     }
+    for (auto& value : s_novaWindows) value = NovaWindow{};
+    uint8_t windows[kNovaWindowBytes] = {};
+    if (prefs.getBytesLength("nova_win_v1") == sizeof(windows) &&
+        prefs.getBytes("nova_win_v1", windows, sizeof(windows)) == sizeof(windows)) {
+      for (size_t i = 0; i < 8; ++i) {
+        const auto* cell = windows + i * 41;
+        if (cell[0] != 1) continue;
+        NovaWindow value; value.automatic = false;
+        for (unsigned b = 0; b < 4; ++b) value.minutes |= static_cast<uint32_t>(cell[b + 1]) << (b * 8);
+        memcpy(value.title, cell + 5, 36);
+        if (valid_nova_window(value)) s_novaWindows[i] = value;
+      }
+    }
     prefs.end();
   }
   s_loaded = true;
   s_savedDim = s_dimMinutes; s_savedWarning = s_warningPercent; s_savedNight = s_night;
   s_savedAppearance = s_appearance;
+  memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
   memcpy(s_savedRules, s_rules, sizeof(s_rules));
 }
 
@@ -71,6 +108,25 @@ uint8_t dim_minutes() {
 }
 
 Appearance appearance() { ensure_loaded(); return s_appearance; }
+NovaWindow nova_window(const char* provider) {
+  ensure_loaded(); const int index = nova_provider_index(provider);
+  return index >= 0 ? s_novaWindows[index] : NovaWindow{};
+}
+void set_nova_window(const char* provider, NovaWindow value) {
+  ensure_loaded(); const int index = nova_provider_index(provider);
+  if (index < 0 || !valid_nova_window(value)) { report_save(false); return; }
+  if (value.automatic) value = NovaWindow{};
+  s_novaWindows[index] = value;
+  uint8_t bytes[kNovaWindowBytes], previous[kNovaWindowBytes];
+  encode_nova_windows(s_novaWindows, bytes); encode_nova_windows(s_savedNovaWindows, previous);
+  if (memcmp(bytes, previous, sizeof(bytes)) == 0) { report_save(true); return; }
+  Preferences prefs; bool saved = false;
+  if (prefs.begin(NVS_NAMESPACE, false)) {
+    saved = prefs.putBytes("nova_win_v1", bytes, sizeof(bytes)) == sizeof(bytes); prefs.end();
+  }
+  if (saved) memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
+  report_save(saved);
+}
 void set_appearance(Appearance value) {
   ensure_loaded(); value = normalize_appearance(value); s_appearance = value;
   if (value.companion == s_savedAppearance.companion && value.theme == s_savedAppearance.theme) { report_save(true); return; }

@@ -11,6 +11,7 @@
 #include "ui/theme.h"
 #include "ai_monitor/ai_monitor.h"
 #include "ui/nova_assets.h"
+#include "ui/quota_window.h"
 
 static lv_obj_t* settingsScreen = nullptr;
 static lv_obj_t* dashScreen = nullptr;
@@ -33,6 +34,11 @@ static lv_obj_t *nightTimeValues[4] = {}, *nightTimeButtons[8] = {}, *nightSlide
 static app_settings::NightSettings nightDraft;
 static lv_obj_t *appearanceOverlay = nullptr, *companionPreview = nullptr;
 static lv_obj_t *companionButtons[2] = {}, *companionCaptions[2] = {}, *themeButtons[4] = {}, *themeCaptions[4] = {};
+static lv_obj_t *quotaButton = nullptr, *quotaOverlay = nullptr, *quotaProviderLabel = nullptr, *quotaSelectionLabel = nullptr;
+static lv_obj_t *quotaButtons[4] = {}, *quotaCaptions[4] = {}, *quotaPrev = nullptr, *quotaNext = nullptr;
+static char quotaProviders[8][16] = {};
+static uint8_t quotaProviderCount = 0, quotaProviderIndex = 0, quotaChoiceCount = 0;
+static app_settings::NovaWindow quotaChoices[3];
 static const uint8_t kDimChoices[] = {0, 1, 5, 10};
 static const char* kDimNames[] = {"OFF", "1 MIN", "5 MIN", "10 MIN"};
 static const uint8_t kBrightnessPresets[] = {25, 50, 75, 100};
@@ -150,6 +156,105 @@ static void theme_select(lv_event_t* event) {
 }
 static void open_appearance(lv_event_t*) { refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
 static void close_appearance(lv_event_t*) { lv_obj_set_hidden(appearanceOverlay, true); }
+
+static void refresh_quota_choices() {
+  if (!quotaProviderCount) {
+    lv_label_set_text(quotaProviderLabel, "No providers configured");
+    lv_label_set_text(quotaSelectionLabel, "Connect the host and select providers first.");
+    for (auto* button : quotaButtons) lv_obj_set_hidden(button, true);
+    lv_obj_set_state(quotaPrev, LV_STATE_DISABLED, true); lv_obj_set_state(quotaNext, LV_STATE_DISABLED, true);
+    return;
+  }
+  const auto* provider = quotaProviders[quotaProviderIndex];
+  const auto* style = aim::provider_style(provider);
+  const auto saved = app_settings::nova_window(provider);
+  lv_label_set_text(quotaProviderLabel, style ? style->label : provider);
+  lv_obj_set_state(quotaPrev, LV_STATE_DISABLED, quotaProviderCount < 2);
+  lv_obj_set_state(quotaNext, LV_STATE_DISABLED, quotaProviderCount < 2);
+  int selectedChoice = saved.automatic ? 0 : -1;
+  int durationChoice = -1;
+  unsigned durationMatches = 0;
+  for (size_t i = 0; i < quotaChoiceCount && !saved.automatic; ++i) {
+    const auto& option = quotaChoices[i];
+    if (saved.minutes != option.minutes) continue;
+    if (strcmp(saved.title, option.title) == 0) selectedChoice = static_cast<int>(i + 1);
+    if (saved.minutes) { durationChoice = static_cast<int>(i + 1); ++durationMatches; }
+  }
+  if (selectedChoice < 0 && durationMatches == 1) selectedChoice = durationChoice;
+  for (size_t i = 0; i < 4; ++i) {
+    lv_obj_set_hidden(quotaButtons[i], i > quotaChoiceCount);
+    if (i > quotaChoiceCount) continue;
+    const bool selected = selectedChoice == static_cast<int>(i);
+    style_button(quotaButtons[i], selected);
+    lv_obj_set_style_text_color(quotaCaptions[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
+    char text[64] = "AUTO / MOST URGENT";
+    if (i) {
+      const auto& option = quotaChoices[i - 1];
+      char period[36]; quota_window_label(option.minutes, option.title, period, sizeof(period));
+      bool duplicateDuration = false;
+      for (size_t other = 0; other < quotaChoiceCount; ++other)
+        duplicateDuration |= other != i - 1 && quotaChoices[other].minutes == option.minutes;
+      if (duplicateDuration) snprintf(text, sizeof(text), "%s / %s", period, option.title);
+      else snprintf(text, sizeof(text), "%s", period);
+    }
+    lv_label_set_text(quotaCaptions[i], text);
+  }
+  char current[36], text[160]; quota_window_label(saved.minutes, saved.title, current, sizeof(current));
+  if (!quotaChoiceCount) snprintf(text, sizeof(text), "No quota windows reported. Activity-only providers keep their local display.");
+  else snprintf(text, sizeof(text), "Selected: %s%s", saved.automatic ? "AUTO / MOST URGENT" : current,
+                selectedChoice >= 0 ? "" : " / not currently reported");
+  lv_label_set_text(quotaSelectionLabel, text);
+}
+static void load_quota_choices() {
+  quotaChoiceCount = 0;
+  if (quotaProviderCount) {
+    const auto snapshot = aim::read();
+    for (size_t v = 0; v < aim::kMaxViews; ++v) {
+      if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
+      const auto& view = snapshot.views[v];
+      if (!view.hasUsage || strcmp(view.providerKey, quotaProviders[quotaProviderIndex]) != 0) continue;
+      for (size_t r = 0; r < view.rowCount && r < aim::kMaxRows && quotaChoiceCount < 3; ++r) {
+        const auto& row = view.rows[r]; if (!row.valid || !row.title[0]) continue;
+        bool duplicate = false;
+        for (size_t i = 0; i < quotaChoiceCount; ++i)
+          duplicate |= quotaChoices[i].minutes == row.windowMinutes && strcmp(quotaChoices[i].title, row.title) == 0;
+        if (duplicate) continue;
+        auto& choice = quotaChoices[quotaChoiceCount++]; choice = app_settings::NovaWindow{};
+        choice.automatic = false; choice.minutes = row.windowMinutes;
+        snprintf(choice.title, sizeof(choice.title), "%s", row.title);
+      }
+    }
+  }
+  refresh_quota_choices();
+}
+static void quota_select_cb(lv_event_t* event) {
+  const auto choice = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+  if (!quotaProviderCount || choice > quotaChoiceCount) return;
+  app_settings::set_nova_window(quotaProviders[quotaProviderIndex], choice ? quotaChoices[choice - 1] : app_settings::NovaWindow{});
+  refresh_quota_choices();
+}
+static void quota_provider_cb(lv_event_t* event) {
+  if (!quotaProviderCount) return;
+  const int direction = reinterpret_cast<intptr_t>(lv_event_get_user_data(event));
+  quotaProviderIndex = (quotaProviderIndex + quotaProviderCount + direction) % quotaProviderCount;
+  load_quota_choices();
+}
+static void close_quota(lv_event_t*) { lv_obj_set_hidden(quotaOverlay, true); }
+static void open_quota(lv_event_t*) {
+  quotaProviderCount = 0; quotaProviderIndex = 0;
+  const auto snapshot = aim::read();
+  for (size_t v = 0; v < aim::kMaxViews; ++v) {
+    if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
+    const auto* key = snapshot.views[v].valid ? snapshot.views[v].providerKey : snapshot.viewKeys[v];
+    if (!aim::provider_style(key)) continue;
+    bool duplicate = false;
+    for (size_t i = 0; i < quotaProviderCount; ++i) duplicate |= strcmp(quotaProviders[i], key) == 0;
+    if (!duplicate && quotaProviderCount < 8) snprintf(quotaProviders[quotaProviderCount++], 16, "%s", key);
+  }
+  // Freeze option identities while the overlay is open. Incoming API row
+  // reordering must not change the meaning of a button during a touch.
+  load_quota_choices(); lv_obj_move_foreground(quotaOverlay); lv_obj_set_hidden(quotaOverlay, false);
+}
 
 static void refresh_warning_target();
 static void warning_slider_cb(lv_event_t* event) {
@@ -276,7 +381,7 @@ void ui_settings_init() {
   lv_obj_set_style_radius(header, 0, 0);
   lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_scrollable(header, false);
-  make_label(header, 24, 12, 420, "AI MONITOR / DISPLAY", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(header, 24, 12, 420, "AI MONITOR / DISPLAY " FW_VERSION, &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_label(header, 24, 34, 500, "Display settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   alertsButton = make_button(header, 608, 16, 168, "ALERTS", open_alerts, nullptr);
 
@@ -328,8 +433,7 @@ void ui_settings_init() {
   make_button(settingsScreen, 24, 424, 152, "<  BACK", back_cb, nullptr);
   nightButton = make_button(settingsScreen, 200, 424, 176, "NIGHT MODE", open_night, nullptr);
   make_button(settingsScreen, 392, 424, 176, "APPEARANCE", open_appearance, nullptr);
-  make_label(settingsScreen, 592, 440, 184, "AI Monitor " FW_VERSION, &lv_font_montserrat_14,
-             ui_theme::muted, LV_TEXT_ALIGN_RIGHT);
+  quotaButton = make_button(settingsScreen, 592, 424, 184, "QUOTA WINDOW", open_quota, nullptr);
   lastDimChoice = lastPresetValue = 255;
   refresh_brightness();
   alertsOverlay = lv_obj_create(lv_layer_top());
@@ -419,6 +523,28 @@ void ui_settings_init() {
   make_label(appearanceCard, 24, 286, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(appearanceCard, 552, 312, 176, "DONE", close_appearance, nullptr);
   lv_obj_set_hidden(appearanceOverlay, true);
+  quotaOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_set_size(quotaOverlay, 800, 480); lv_obj_set_pos(quotaOverlay, 0, 0);
+  lv_obj_set_style_bg_color(quotaOverlay, lv_color_hex(ui_theme::background), 0);
+  lv_obj_set_style_bg_opa(quotaOverlay, LV_OPA_80, 0); lv_obj_set_style_border_width(quotaOverlay, 0, 0);
+  lv_obj_set_style_pad_all(quotaOverlay, 0, 0); lv_obj_set_scrollable(quotaOverlay, false);
+  auto* quotaCard = lv_obj_create(quotaOverlay);
+  lv_obj_set_pos(quotaCard, 24, 54); lv_obj_set_size(quotaCard, 752, 374);
+  lv_obj_set_style_bg_color(quotaCard, lv_color_hex(ui_theme::surface), 0);
+  lv_obj_set_style_border_color(quotaCard, lv_color_hex(ui_theme::border), 0);
+  lv_obj_set_style_pad_all(quotaCard, 0, 0); lv_obj_set_scrollable(quotaCard, false);
+  make_label(quotaCard, 24, 18, 700, "Companion quota windows", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  quotaPrev = make_button(quotaCard, 24, 72, 96, "< PREV", quota_provider_cb, reinterpret_cast<void*>(-1));
+  quotaNext = make_button(quotaCard, 632, 72, 96, "NEXT >", quota_provider_cb, reinterpret_cast<void*>(1));
+  quotaProviderLabel = make_label(quotaCard, 132, 84, 484, "", &lv_font_montserrat_20, ui_theme::text, LV_TEXT_ALIGN_CENTER);
+  for (size_t i = 0; i < 4; ++i)
+    quotaButtons[i] = make_button(quotaCard, 24 + (i % 2) * 360, 138 + (i / 2) * 64, 344, "",
+                                  quota_select_cb, reinterpret_cast<void*>(i), &quotaCaptions[i]);
+  quotaSelectionLabel = make_label(quotaCard, 24, 272, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(quotaCard, 24, 310, 510, "Alerts still watch all windows. Applies to NOVA and ORBIT.",
+             &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_button(quotaCard, 552, 310, 176, "DONE", close_quota, nullptr);
+  lv_obj_set_hidden(quotaOverlay, true);
   ui_theme::watch(settingsScreen); refresh_appearance();
   saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
   lv_obj_set_hidden(saveFeedback, true);
@@ -439,7 +565,7 @@ static void refresh_brightness() {
 }
 
 void ui_settings_update() {
-  const bool choosing = !lv_obj_is_hidden(appearanceOverlay);
+  const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay);
   if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
   const int x = choosing ? 48 : 590, y = choosing ? 446 : 406;
   if (lv_obj_get_x(saveFeedback) != x || lv_obj_get_y(saveFeedback) != y) lv_obj_set_pos(saveFeedback, x, y);
@@ -462,6 +588,7 @@ void ui_settings_hide() {
   lv_obj_set_hidden(saveFeedback, true);
   lv_obj_set_hidden(alertsOverlay, true); lv_obj_set_hidden(nightOverlay, true);
   lv_obj_set_hidden(appearanceOverlay, true);
+  lv_obj_set_hidden(quotaOverlay, true);
   lv_screen_load(settingsReturnScreen ? settingsReturnScreen : dashScreen);
 }
 bool ui_settings_is_active() { return lv_screen_active() == settingsScreen; }

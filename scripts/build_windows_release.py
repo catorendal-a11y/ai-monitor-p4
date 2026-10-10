@@ -54,6 +54,7 @@ def main():
     scratch = ROOT / 'work/windows-build'
     scratch.mkdir(parents=True, exist_ok=True)
     common = ['-m', 'PyInstaller', '--noconfirm', '--clean',
+              '--version-file', str(ROOT/'scripts/windows_version.txt'),
               '--distpath', str(package), '--workpath', str(scratch / 'build'), '--specpath', str(scratch)]
     if args.executables_dir:
         for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe'):

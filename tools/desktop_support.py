@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import subprocess
 import sys
+import time
 
 import aim_control as control
 from board_profiles import get_board
@@ -97,11 +98,41 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
     if current_port != port:
         raise control.SetupError('USB selection changed. Prepare firmware again.')
     control.stop_host(root)
+    if kind == 'update':
+        # Application-only updates require this project's existing layout.
+        panel = None
+        try:
+            panel = control.host.Panel(port)
+            panel.expected_board = get_board(board_id)
+            time.sleep(0.5)
+            panel.heartbeat()
+        except (RuntimeError, TimeoutError, OSError, control.host.serial.SerialException):
+            raise control.SetupError('Existing AI Monitor identity could not be verified. '
+                'Check the board/port. A factory demo or another project requires First installation. '
+                'The host is stopped; no firmware was written.') from None
+        finally:
+            if panel is not None:
+                panel.close()
+    environment = dict(os.environ)
+    environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
     with subprocess.Popen(command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, errors='replace',
+                          stderr=subprocess.STDOUT, text=True, errors='replace', env=environment,
                           creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0) as process:
         for line in iter(lambda: process.stdout.readline(512), ''):
             emit(safe_text(line))
         if process.wait() != 0:
             raise control.SetupError('Firmware tool failed. Check the USB port and device connection.')
-    emit('Firmware written. Reconnect the display if needed, then start the host.')
+    emit('Firmware written. The display will reboot; reconnect if needed.')
+
+
+def check_flasher_runtime(root: Path) -> bool:
+    """Read image metadata using the exact child EXE, without opening USB."""
+    environment = dict(os.environ); environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    for board in control.BOARDS.values():
+        image = control.firmware_file('update', root, board.id)
+        result = subprocess.run([str(root/'firmware-flasher.exe'), '--chip', board.chip, 'image-info', str(image)],
+            cwd=root, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            timeout=30, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        if result.returncode:
+            return False
+    return True

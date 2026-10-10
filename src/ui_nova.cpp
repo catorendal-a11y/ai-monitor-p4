@@ -9,6 +9,7 @@
 #include "ui/nova_state.h"
 #include "ui/nova_assets.h"
 #include "ui/quota_alert.h"
+#include "ui/quota_window.h"
 #include "ui/theme.h"
 #include "ui_settings.h"
 #include "ui_usage_details.h"
@@ -210,18 +211,12 @@ void update() {
     lv_obj_set_x(item.bar, brand ? 62 : 8); lv_obj_set_width(item.bar, brand ? 240 : 294);
     lv_obj_set_x(item.status, brand ? 62 : 8); lv_obj_set_width(item.status, brand ? 240 : 294);
     text(item.name, style ? style->label : key);
-    const aim::Row* selectedRow = &view.rows[0];
-    bool hasRow = false; float remaining = 0; unsigned severity = 0;
-    if (view.hasUsage) for (size_t r = 0; r < view.rowCount; ++r) {
-      const auto& candidate = view.rows[r]; if (!candidate.valid) continue;
-      const float candidateRemaining = view.showsRemaining ? candidate.usedPercent : 100.0f - candidate.usedPercent;
-      const unsigned candidateSeverity = quota_critical(candidateRemaining, key, candidate) ? 2 : (quota_low(candidateRemaining, key, candidate) ? 1 : 0);
-      if (!hasRow || candidateSeverity > severity || (candidateSeverity == severity && candidateRemaining < remaining)) {
-        selectedRow = &candidate; remaining = candidateRemaining; severity = candidateSeverity; hasRow = true;
-      }
-    }
+    const auto choice = app_settings::nova_window(key);
+    const auto* selectedRow = nova_quota_row(view, key, choice);
+    const bool hasRow = selectedRow != nullptr;
+    const float remaining = hasRow ? (view.showsRemaining ? selectedRow->usedPercent : 100.0f - selectedRow->usedPercent) : 0;
     const bool fresh = hasRow && !view.notice && !view.fetching && snapshot.hostPresent && now - view.quotaReceivedMs < 300000u;
-    const auto& row = *selectedRow;
+    const auto& row = selectedRow ? *selectedRow : view.rows[0];
     const uint32_t color = !fresh ? ui_theme::muted : (quota_critical(remaining, key, row) ? 0xFF5252 :
                             (quota_low(remaining, key, row) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
     if (item.color != color) { item.color = color; lv_obj_set_style_bg_color(item.bar, lv_color_hex(color), LV_PART_INDICATOR); }
@@ -230,8 +225,11 @@ void update() {
     text(item.percent, value);
     lv_obj_set_hidden(item.bar, view.informational);
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
+    char period[48], selectedStatus[64];
+    quota_window_label(row.windowMinutes, row.title, period, sizeof(period));
+    snprintf(selectedStatus, sizeof(selectedStatus), "%s%s", period, choice.automatic ? " / AUTO" : "");
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
-                          (view.fetching ? "UPDATING / last good" : (!hasRow ? "Waiting for data" : (!fresh ? "STALE / last good" : row.title)))));
+                          (view.fetching ? "UPDATING / last good" : (!hasRow ? (choice.automatic ? "Waiting for data" : "Selected window unavailable") : (!fresh ? "STALE / last good" : selectedStatus)))));
     text(item.status, status);
   }
 }

@@ -90,6 +90,18 @@ jobs:
       - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-release.txt -r scripts/requirements-test.txt
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: python scripts/build_windows_release.py --firmware-dir work/prebuilt
+      - name: Install authenticated pinned installer compiler
+        shell: pwsh
+        run: ./scripts/install_inno_builder.ps1 -Destination work/inno-builder
+      - name: Build and test per-user installer
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem work/windows-release -Directory | Select-Object -First 1
+          python scripts/build_windows_installer.py --package $package.FullName --compiler work/inno-builder/compiler/ISCC.exe --output work/windows-release
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+          $installer = Get-ChildItem work/windows-release -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
+          python scripts/test_windows_install.py --installer $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Installer smoke tests failed.' }
       - name: Smoke test portable executables
         shell: pwsh
         run: |
@@ -106,7 +118,9 @@ jobs:
         shell: pwsh
         run: |
           $archive = Get-ChildItem work/windows-release -Filter '*.zip' | Select-Object -First 1
+          $installer = Get-ChildItem work/windows-release -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
           $sum = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
+          $sum += [Environment]::NewLine + (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $installer.Name
           $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
           [IO.File]::WriteAllText($sums, $sum + [Environment]::NewLine)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -114,6 +128,7 @@ jobs:
           name: release-package
           path: |
             work/windows-release/*.zip
+            work/windows-release/AI-Monitor-Setup-*
             work/windows-release/SHA256SUMS.txt
             docs/RELEASE_NOTES.md
           if-no-files-found: error
@@ -140,7 +155,10 @@ jobs:
           $archive = Get-ChildItem work/publish/work/windows-release -Filter '*.zip' | Select-Object -First 1
           if (-not $archive) { throw 'Release archive missing.' }
           $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
+          $installer = Get-ChildItem $archive.DirectoryName -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
+          if (-not $installer) { throw 'Installer asset missing.' }
           $sum = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
+          $sum += [Environment]::NewLine + (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $installer.Name
           [IO.File]::WriteAllText($sums, $sum + [Environment]::NewLine)
-          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "AI Monitor P4 $env:GITHUB_REF_NAME" --notes-file work/publish/docs/RELEASE_NOTES.md
+          gh release create $env:GITHUB_REF_NAME $archive.FullName $installer.FullName $sums --verify-tag --draft --title "AI Monitor $env:GITHUB_REF_NAME" --notes-file work/publish/docs/RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }

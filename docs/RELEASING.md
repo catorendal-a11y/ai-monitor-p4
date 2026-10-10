@@ -6,8 +6,8 @@ The portable Windows archive lets users run the companion and flash the display 
 
 1. Push the reviewed, credential-free repository to your GitHub repository. Do not copy local configurations, logs or unrelated output files.
 2. Ensure Actions is enabled. Set `FW_VERSION` to the intended version and pass CI. Commit before tagging.
-3. Create and push a tag matching `FW_VERSION`, such as `v1.14.0`. This explicitly starts the Portable Windows release workflow.
-4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables and creates a **draft release** containing the Windows ZIP and its SHA-256 checksum. Drafts are invisible to ordinary downloaders.
+3. Create and push a tag matching `FW_VERSION`, such as `v1.15.0`. This explicitly starts the Portable Windows release workflow.
+4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables, verifies the pinned Inno Setup compiler, and tests clean installation, upgrade and uninstall. It creates a **draft release** containing the Windows installer, portable ZIP and SHA-256 checksums. Drafts are invisible to ordinary downloaders.
 5. Download the draft ZIP, extract it on Windows, test the menu, setup and firmware on the target board, and verify no private files are included. Review license notices and the corresponding upstream source.
 6. Publish the reviewed draft using GitHub's Releases UI. README's recommended download is available after publication.
 
@@ -45,3 +45,13 @@ The script builds a windowed `AI-Monitor.exe` with its replaceable `_internal` Q
 The desktop build uses a clean PATH to avoid unrelated ICU DLLs. An unexpected bundled ICU aborts packaging; the exact windowed EXE must pass --gui-check before archiving. The native desktop tests use synthetic settings and never flash or log into a real account.
 
 Tagging/publishing is a maintainer action. Preparing an archive locally does not upload it to GitHub.
+
+Keep `scripts/windows_version.txt`, firmware, desktop and client versions synchronized. After building the portable package, create and test the per-user installer:
+
+```powershell
+./scripts/install_inno_builder.ps1 -Destination work/inno-builder
+.\.venv\Scripts\python.exe scripts/build_windows_installer.py --package work/windows-release/ai-monitor-p4-v1.15.0-windows --compiler work/inno-builder/compiler/ISCC.exe --output work/windows-release
+.\.venv\Scripts\python.exe scripts/test_windows_install.py --installer work/windows-release/AI-Monitor-Setup-v1.15.0-windows.exe
+```
+
+Run installer smoke tests on a clean Windows user profile; they refuse to overwrite a registered installation. The compiler is hash-pinned and its upstream Authenticode publisher is verified; that does not sign our resulting app. Until a signing identity is available, label the release unsigned and retain [Windows protection](WINDOWS_TRUST.md). The installer excludes private configuration; uninstall never recursively deletes user data.

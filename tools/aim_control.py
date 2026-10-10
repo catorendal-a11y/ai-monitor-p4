@@ -194,7 +194,7 @@ def stop_host(root=ROOT):
 
 def start_host(root=ROOT):
     # Validate before replacing the running host. Never echo configuration/keys.
-    config = host.load_config()
+    config = local_config(root)
     if not config['providers']:
         raise SetupError('Choose your AI providers in First-time setup before starting the host.')
     if not config.get('board'):

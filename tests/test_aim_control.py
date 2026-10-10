@@ -19,6 +19,7 @@ class SetupTests(unittest.TestCase):
     def test_frozen_host_outlives_menu_using_independent_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, providers=['codex'], board='guition-p4'), root)
             child = Mock(); child.poll.return_value = None
             with patch.object(control.sys, 'frozen', True, create=True), \
                     patch.object(control.host, 'load_config', return_value={'providers': ['codex'], 'board':'guition-p4'}), patch.object(control, 'stop_host'), \

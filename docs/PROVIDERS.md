@@ -17,6 +17,12 @@ First-time setup has **no preselected AI**. Check one or more providers explicit
 
 The graphical app exposes these limitations in each provider's tooltip; the console menu also lists them. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
 
+## ZCode
+
+Use ZCode normally on this PC for local token activity. For quota percentages, obtain your own **GLM Coding Plan API key** from the appropriate plan page in your Z.AI account; [official key instructions](https://docs.z.ai/devpack/quick-start). Select ZCode in Setup, paste the key into the masked field and save. The monitor does not recover ZCode's encrypted login or ask for your Z.AI password. Leave the key blank if you only want local activity; an existing saved key is preserved unless explicitly replaced or cleared.
+
+The quota adapter displays the rows returned by the account's quota endpoint, including five-hour and monthly rows when available. Limits depend on the plan and provider version; a monthly row is not automatically a model-token monthly budget. **SET > QUOTA WINDOW** lists actual reported rows. Missing data remains unavailable. Keep local configuration private.
+
 ## Claude Code
 
 Local activity uses assistant `message.usage` numeric fields from recent default CLI transcripts under `~/.claude/projects/`. Records with the same `message.id` are not counted twice; increases in a streamed record may still be registered later. Inputs, outputs and reported cache tokens are observed counts, not an invoice. CLI versions may omit or incompletely report output usage. Desktop/web sessions have separate storage and are not automatically covered.

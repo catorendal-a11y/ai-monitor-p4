@@ -23,9 +23,9 @@ import aim_control as control
 import desktop_support as desktop
 from board_profiles import BOARDS, get_board
 from host_security import safe_text
-from provider_catalog import PROVIDERS
+from provider_catalog import PROVIDERS, PROVIDER_SETUP
 
-APP_VERSION = 'v1.14.0'
+APP_VERSION = 'v1.15.0'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''
@@ -119,6 +119,9 @@ class FirmwareDialog(QDialog):
         layout.addWidget(self.kind)
         layout.addWidget(label('For a factory demo or a different project, use First installation. '
                                'An update requires the existing AI Monitor partition layout.', 'muted', True))
+        self.start_after = QCheckBox('Start the host after a successful firmware installation')
+        self.start_after.setChecked(True)
+        layout.addWidget(self.start_after)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -294,6 +297,8 @@ class MonitorWindow(QMainWindow):
         form = QVBoxLayout(content)
         form.setContentsMargins(0, 15, 0, 0)
         form.setSpacing(10)
+        form.addWidget(label('Choose your board and providers below. Follow each provider\'s instructions, '
+                             'save settings, then install display firmware if needed and start the host.', 'muted', True))
         form.addWidget(label('DISPLAY AND CONNECTION', 'eyebrow'))
         fields = QGridLayout()
         self.board = QComboBox()
@@ -330,11 +335,24 @@ class MonitorWindow(QMainWindow):
             checkbox = QCheckBox(name)
             checkbox.setToolTip(support)
             checkbox.setAccessibleDescription(support)
-            checkbox.toggled.connect(self._changed)
+            checkbox.toggled.connect(lambda checked, provider=key: self._provider_changed(provider, checked))
             grid.addWidget(checkbox, index // 2, index % 2)
             self.providers[key] = checkbox
         form.addLayout(grid)
-        form.addWidget(label('Codex, ZCode, Claude and Gemini have local adapters. Other tools need a numeric bridge.', 'muted', True))
+        form.addWidget(label('SETUP INSTRUCTIONS FOR EACH AI', 'eyebrow'))
+        self.provider_guide = QComboBox()
+        self.provider_guide.setAccessibleName('AI provider setup instructions')
+        for key, (name, _, _) in PROVIDERS.items():
+            self.provider_guide.addItem(name, key)
+        self.provider_guide.setCurrentIndex(-1)
+        self.provider_guide.setPlaceholderText('Choose an AI to read its setup instructions')
+        self.provider_instructions = label('Choose an AI above to see what it needs. No AI is preselected.', 'muted', True)
+        self.provider_link = self._button('Open official setup guide', self._open_provider_guide)
+        self.provider_link.setEnabled(False)
+        self.provider_guide.currentIndexChanged.connect(self._show_provider_guide)
+        form.addWidget(self.provider_guide)
+        form.addWidget(self.provider_instructions)
+        form.addWidget(self.provider_link)
         self.key_row = QWidget()
         key_layout = QHBoxLayout(self.key_row)
         key_layout.setContentsMargins(0, 0, 0, 0)
@@ -346,6 +364,8 @@ class MonitorWindow(QMainWindow):
         key_layout.addWidget(self.key, 1)
         key_layout.addWidget(self.clear_key)
         form.addWidget(self.key_row)
+        form.addWidget(label('After Start host succeeds, you can close this app. The host keeps running invisibly '
+                             'until you click Stop host, sign out or shut down the PC.', 'muted', True))
         bottom = QHBoxLayout()
         bottom.addWidget(label('Quota refresh'))
         self.interval = QSpinBox()
@@ -380,6 +400,8 @@ class MonitorWindow(QMainWindow):
         layout.addWidget(self.flash_button)
         layout.addWidget(label('You will review the exact board, port and operation and type FLASH before writing. '
                                'The host is stopped only after confirmation. Restart it after flashing.', 'muted', True))
+        layout.addWidget(label('Keep this window open while writing. Progress and errors stay in the Activity panel below. '
+                               'firmware-flasher.exe is a command-line helper; use this button for normal installation.', 'muted', True))
         layout.addStretch()
         return widget
 
@@ -428,6 +450,22 @@ class MonitorWindow(QMainWindow):
         if mark:
             self.unsaved = True
             self.notice.setText('Unsaved changes — save before starting or preparing firmware.')
+
+    def _provider_changed(self, provider, checked):
+        if checked and hasattr(self, 'provider_guide'):
+            self.provider_guide.setCurrentIndex(self.provider_guide.findData(provider))
+        self._changed()
+
+    def _show_provider_guide(self):
+        key = self.provider_guide.currentData()
+        if key in PROVIDER_SETUP:
+            self.provider_instructions.setText(PROVIDER_SETUP[key][0])
+            self.provider_link.setEnabled(True)
+
+    def _open_provider_guide(self):
+        key = self.provider_guide.currentData()
+        if key in PROVIDER_SETUP:
+            QDesktopServices.openUrl(QUrl(PROVIDER_SETUP[key][1]))
 
     def rescan(self):
         current = self.port.currentText() or self.config['port']
@@ -485,6 +523,7 @@ class MonitorWindow(QMainWindow):
             button.setEnabled(False)
         self.tabs.setEnabled(False)
         self.progress.show()
+        self.console_tabs.setCurrentIndex(0)
         self.notice.setText(name + '…')
         self.worker = ActionWorker(action, name)
         self.worker.signals.output.connect(self.append_output)
@@ -538,7 +577,13 @@ class MonitorWindow(QMainWindow):
         if confirm.exec() != QDialog.DialogCode.Accepted or confirm.confirm.text().strip() != 'FLASH':
             self.append_output('Firmware cancelled. Host and display were not changed.')
             return
-        self._run('Writing firmware', lambda emit: desktop.write_firmware(self.root, board_id, kind, port, emit))
+        start_after = operation.start_after.isChecked()
+        def install(emit):
+            desktop.write_firmware(self.root, board_id, kind, port, emit)
+            if start_after:
+                control.start_host(self.root)
+                emit('Setup complete. You may close this window; the host stays running.')
+        self._run('Writing firmware', install)
 
     def append_output(self, text: str):
         for secret in self.secrets:
@@ -586,7 +631,7 @@ class MonitorWindow(QMainWindow):
         event.accept()  # The independent background host is deliberately left running.
 
 
-def run_desktop() -> int:
+def run_desktop(firmware: bool = False) -> int:
     application = QApplication.instance() or QApplication(sys.argv[:1])
     application.setApplicationName('AI Monitor')
     application.setOrganizationName('AI Monitor contributors')
@@ -597,5 +642,7 @@ def run_desktop() -> int:
         QMessageBox.critical(None, 'Configuration unavailable',
             'Repair the local tools/aim_host.json file or extract a fresh package. Your file was not changed.')
         return 1
+    if firmware:
+        window.tabs.setCurrentIndex(1)
     window.show()
     return application.exec()

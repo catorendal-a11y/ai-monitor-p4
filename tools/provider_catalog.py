@@ -10,6 +10,35 @@ PROVIDERS = {
     'opencode': ('OpenCode', 128, 'External numeric bridge required; SDK usage export can be supplied'),
 }
 
+# Instructions are bundled and visible without a browser or a cloud request.
+PROVIDER_SETUP = {
+    'codex': ('1. Select Codex and save settings.\n2. Click Provider setup for the official CLI installer/sign-in. '
+              'Use your own account; no API key is required here.\n3. Use Codex normally. Local tokens animate the robot; '
+              'the CLI supplies available 5-hour and 7-day quotas.',
+              'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/CODEX_SETUP.md'),
+    'zcode': ('1. Install ZCode and sign in with your own account for local token activity.\n'
+              '2. For quota percentages, create a Z.AI Coding Plan API key in your Z.AI account and paste it '
+              'in the masked field below. Save settings.\n3. Without a key, local activity still works but quota '
+              'is unavailable. The display lists only the windows your plan reports.',
+              'https://docs.z.ai/devpack/quick-start'),
+    'claude': ('1. Install Claude Code, sign in and use the CLI on this PC. Local token records are read automatically.\n'
+               '2. For available subscription quotas, click Provider setup and explicitly install the optional '
+               'statusline bridge. Existing custom statuslines are preserved.\n3. Restart Claude Code. '
+               'A Claude API key alone does not supply subscription quotas.',
+               'https://code.claude.com/docs/en/statusline'),
+    'gemini': ('1. Install Gemini CLI and sign in with your own account.\n2. Use recorded CLI sessions on this PC; '
+               'the monitor reads their numeric token totals.\n3. This integration displays LOCAL activity. '
+               'Automatic remaining account quota is unavailable; no key is entered in this app.',
+               'https://geminicli.com/docs/cli/session-management/'),
+    **{key: (f'1. Select {name} and save settings.\n2. Connect your own integration to '
+              f'AI-Monitor-Console.exe --ingest {key}, sending cumulative numeric token counters. '
+              'See the bundled provider guide for the JSON format.\n3. This bridge shows LOCAL activity. '
+              'Selecting the provider alone does not import editor activity or account quota.',
+              'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md#external-numeric-bridge')
+       for key, name in [('copilot', 'GitHub Copilot'), ('cursor', 'Cursor'),
+                         ('antigravity', 'Antigravity'), ('opencode', 'OpenCode')]},
+}
+
 
 def selected_providers(config, legacy=False):
     values = config.get('providers')

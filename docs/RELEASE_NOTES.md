@@ -1,13 +1,14 @@
-# AI Monitor v1.14.0
+# AI Monitor v1.15.0
 
-The Windows PC companion now opens as a graphical desktop app with the original NOVA artwork and a NOVA application icon. Save board/provider settings with checkboxes and dropdowns, start/stop the hidden host, and read its terminal-style Activity and Host log panels.
+Choose the quota window shown by NOVA/ORBIT independently for each AI in **SET > QUOTA WINDOW**. Codex offers 5-hour/7-day rows; ZCode offers 5-hour/monthly rows when its plan reports them. Other providers list actual available quotas. AUTO keeps the most urgent quota visible. Selections survive reboot and application updates; missing selected windows remain unavailable, and alerts still watch all windows.
 
-- Keyboard-accessible native controls, masked optional API-key entry and bounded, redacted logs.
-- Separate background/console helper preserves host lifetime after the window closes and retains numeric telemetry/stdin support.
-- Verified board-specific firmware installation still requires a review dialog and typing FLASH. Cancellation leaves the host and display untouched.
-- Provider setup opens the existing official Codex/Claude onboarding console only after a user requests it. No model generation or incoming network service is added.
-- Clean-path Qt packaging and an exact EXE smoke test catch incompatible runtime DLLs before release. Keep the _internal folder beside AI-Monitor.exe.
+- Larger notifications: 136-pixel banner, 24-pixel heading, 20-pixel quota text and a 60-pixel-high DISMISS button.
+- Visible instructions for all eight AI choices, including ZCode's Coding Plan key, official Codex/Claude setup and activity-only bridge requirements.
+- **AI-Monitor-Setup-v1.15.0-windows.exe** installs the complete app for the current user and opens setup. No Python, PlatformIO or administrator rights are required. The portable ZIP remains available.
+- Double-clicking the command-line firmware helper explains its purpose and offers to open the graphical Firmware tab. Writes retain progress/error messages; the app cannot close during a write and can start the host after success.
+- Packaged Qt diagnostics invoke the exact flasher child on both images without USB writes. Installer checks cover clean setup, runtime startup, upgrade and settings-preserving uninstall.
+- The independent host keeps running after closing the app, until stopped, sign-out or shutdown. Private keys/configuration are not distributed.
 
-The package includes both P4 and experimental original Waveshare S3 firmware. **S3 is still unverified on physical hardware; B/C variants are unsupported.** Existing P4 v1.12.0+ firmware can keep working with the updated host. No local maintainer credentials or usage records are distributed.
+**Windows trust:** this release is unsigned. SmartScreen may warn; version metadata and an installer do not replace trusted signing/reputation. Windows protections remain enabled. See the Windows trust guide included in the package.
 
-Download ai-monitor-p4-v1.14.0-windows.zip, extract the complete folder, then open AI-Monitor.exe. Advanced CLI/telemetry uses AI-Monitor-Console.exe. Stop your previous folder's host before upgrading; privately copy tools/aim_host.json if you want to preserve settings.
+**Hardware:** P4 and the original Waveshare S3 have separate firmware. S3 remains experimental and unverified on physical S3 hardware; B/C variants are unsupported. Use an application update on an existing AI Monitor to retain settings; First installation resets them. Stop a portable host from its original folder before switching to the installer version.
