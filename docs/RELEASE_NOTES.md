@@ -1,3 +1,15 @@
+# AI Monitor v1.17.1
+
+A full uninstall, flash erase and GUI first-installation test found a P4 bootloader defect that application-only updates did not expose: the factory image declared 4 MB flash while its board and partition table require 16 MB. The write/hash check succeeded, but the board then boot-looped. The build now explicitly sets the image header to 16 MB.
+
+- Packaging and first-installation preflight validate the bootloader flash capacity, partition checksum, bounds, alignment, overlap and application fit. Valid file hashes alone are insufficient to approve an image.
+- Factory validation runs before collecting firmware and before invoking a flasher. Existing application-only updates remain separate.
+- Disabled primary buttons now look disabled during a firmware write. Closing the window during writing remains blocked.
+- Firmware completion reports a started process and asks users to check USB/provider health, rather than claiming the display is already connected. It respects the saved stop-on-close preference.
+- The multiple-port warning no longer incorrectly claims a previous host exists.
+
+v1.17.0's P4 factory image must not be used for new installations. Published assets have not been overwritten. Windows binaries remain unsigned, and S3 still requires physical validation.
+
 # AI Monitor v1.17.0
 
 The Windows host now separates background-process status, verified USB connection and provider quota health. Two matching devices no longer produce a misleading successful start. Select the display port explicitly; the existing host is preserved when preflight fails.

@@ -12,6 +12,7 @@ class Board:
     environment: str
     usb_vids: tuple
     experimental: bool = False
+    flash_bytes: int = 16 * 1024 * 1024
 
 
 BOARDS = {

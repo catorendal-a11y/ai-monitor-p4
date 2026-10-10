@@ -213,7 +213,7 @@ def start_host(root=ROOT):
         if len(candidates) > 1:
             raise SetupError('More than one matching USB port was found: ' + ', '.join(candidates) +
                 '. Select your display\'s explicit USB port in Setup, click Save settings, then Start host. '
-                'The existing host was left running; no new host was started.')
+                  'Any existing host was left unchanged; no new host was started.')
     stop_host(root)
     if getattr(sys, "frozen", False):
         helper = root / 'AI-Monitor-Console.exe'
@@ -273,7 +273,8 @@ def firmware_file(kind, root=ROOT, board_id='guition-p4'):
             check_chip(app)
             if kind == 'install':
                 check_chip(data, board.bootloader_offset)
-                if data[0x10000:0x10000+len(app)] != app: raise ValueError()
+                from firmware_layout import validate_factory
+                validate_factory(data, app, board)
     except (ValueError, KeyError, TypeError, AttributeError, OSError, struct.error):
         raise SetupError('Firmware board/chip/layout or checksum verification failed. Extract a matching release package.') from None
     return path

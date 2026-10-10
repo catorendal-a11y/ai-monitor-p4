@@ -19,11 +19,14 @@ from board_profiles import BOARDS, configured_board, get_board, matches_info
 def images(root, board_id):
     board = get_board(board_id)
     folder = root / 'firmware' / board_id; folder.mkdir(parents=True)
-    header = bytearray(24); header[0] = 0xe9; struct.pack_into('<H', header, 12, board.image_chip_id)
+    header = bytearray(24); header[0] = 0xe9; header[3] = 0x4f
+    struct.pack_into('<H', header, 12, board.image_chip_id)
     app = bytes(header) + b'synthetic-application'
     factory = bytearray(b'\xff' * (0x10000 + len(app)))
     factory[board.bootloader_offset:board.bootloader_offset+24] = header
     factory[0x10000:] = app
+    entry = struct.pack('<HBBII16sI', 0x50aa, 0, 0, 0x10000, 0x640000, b'app0', 0)
+    factory[0x8000:0x8040] = entry + b'\xeb\xeb' + b'\xff' * 14 + hashlib.md5(entry, usedforsecurity=False).digest()
     records = {}
     for name, data, offset in [('application.bin', app, 0x10000), ('factory.bin', factory, 0)]:
         (folder / name).write_bytes(data)

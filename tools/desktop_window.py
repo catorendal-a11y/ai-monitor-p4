@@ -26,7 +26,7 @@ from host_security import safe_text
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 from host_status import read_status
 
-APP_VERSION = 'v1.17.0'
+APP_VERSION = 'v1.17.1'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''
@@ -46,7 +46,7 @@ QPushButton:hover { background: #324f5c; border-color: #7ab8cf; }
 QPushButton:focus { border: 2px solid #c8fff0; }
 QPushButton#primary { background: #35c987; color: #071c12; border-color: #35c987; }
 QPushButton#primary:hover { background: #72e6b0; }
-QPushButton:disabled { color: #a5b5bd; background: #20303a; border-color: #30444e; }
+QPushButton:disabled, QPushButton#primary:disabled { color: #a5b5bd; background: #20303a; border-color: #30444e; }
 QLineEdit, QComboBox, QSpinBox { background: #0c161d; border: 1px solid #4b6875;
                               border-radius: 7px; padding: 8px; min-height: 22px; }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 2px solid #70e6ae; }
@@ -484,7 +484,7 @@ class MonitorWindow(QMainWindow):
         self.flash_button = self._button('Install / update &firmware…', self.flash, primary=True)
         layout.addWidget(self.flash_button)
         layout.addWidget(label('You will review the exact board, port and operation and type FLASH before writing. '
-                               'The host is stopped only after confirmation. Restart it after flashing.', 'muted', True))
+                               'The host is stopped only after confirmation. Choose automatic host start in the next dialog.', 'muted', True))
         layout.addWidget(label('Keep this window open while writing. Progress and errors stay in the Activity panel below. '
                                'firmware-flasher.exe is a command-line helper; use this button for normal installation.', 'muted', True))
         layout.addStretch()
@@ -758,7 +758,9 @@ class MonitorWindow(QMainWindow):
             desktop.write_firmware(self.root, board_id, kind, port, emit)
             if start_after:
                 control.start_host(self.root)
-                emit('Setup complete. You may close this window; the host stays running.')
+                emit('Firmware written and host process started. Check USB and provider health in Host settings. ' +
+                     ('You may close this window; the host stays running.' if self.config['keep_host_on_close'] else
+                      'Your Host settings stop the host when this window closes.'))
         self._run('Writing firmware', install)
 
     def append_output(self, text: str):

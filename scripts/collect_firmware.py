@@ -10,6 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from board_profiles import BOARDS
+from firmware_layout import validate_factory
 
 
 def collect(environment, output):
@@ -20,6 +21,7 @@ def collect(environment, output):
     application = factory.with_name(factory.name.replace('.factory.bin', '.bin'))
     version = re.search(r'#define FW_VERSION "([^"]+)"', (ROOT/'src/config.h').read_text()).group(1)
     if version.encode() not in application.read_bytes(): raise ValueError('Application does not match current firmware version')
+    validate_factory(factory.read_bytes(), application.read_bytes(), board)
     folder = output / board.id
     folder.mkdir(parents=True, exist_ok=True)
     files = {}
