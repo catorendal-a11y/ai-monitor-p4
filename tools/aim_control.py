@@ -199,7 +199,17 @@ def start_host(root=ROOT):
         raise SetupError('Choose your AI providers in First-time setup before starting the host.')
     if not config.get('board'):
         raise SetupError('Choose your display board in First-time setup before starting the host.')
-    get_board(config['board'])
+    board = get_board(config['board'])
+    if config['port'] == 'auto':
+        try:
+            candidates = sorted({serial_port(port.device) for port in list_ports.comports()
+                                 if port.vid in board.usb_vids})
+        except (ValueError, OSError):
+            raise SetupError('USB ports could not be checked. Choose your display port in Setup and save settings.') from None
+        if len(candidates) > 1:
+            raise SetupError('More than one matching USB port was found: ' + ', '.join(candidates) +
+                '. Select your display\'s explicit USB port in Setup, click Save settings, then Start host. '
+                'The existing host was left running; no new host was started.')
     stop_host(root)
     if getattr(sys, "frozen", False):
         helper = root / 'AI-Monitor-Console.exe'

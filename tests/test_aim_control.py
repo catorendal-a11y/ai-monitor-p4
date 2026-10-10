@@ -16,6 +16,29 @@ class SetupTests(unittest.TestCase):
     def setUp(self):
         prepare = patch.object(control, 'setup_codex', return_value=True)
         prepare.start(); self.addCleanup(prepare.stop)
+        ports = patch.object(control.list_ports, 'comports', return_value=[])
+        ports.start(); self.addCleanup(ports.stop)
+    def test_ambiguous_auto_port_fails_before_replacing_a_running_host(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, providers=['codex'], board='guition-p4'), root)
+            ports = [Mock(device='COM4', vid=0x303a), Mock(device='COM6', vid=0x303a)]
+            with patch.object(control.list_ports, 'comports', return_value=ports), \
+                    patch.object(control, 'stop_host') as stop, \
+                    patch.object(control.subprocess, 'Popen') as spawn:
+                with self.assertRaisesRegex(control.SetupError, 'COM4.*COM6'):
+                    control.start_host(root)
+            stop.assert_not_called(); spawn.assert_not_called()
+
+    def test_explicit_port_works_with_multiple_matching_boards(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, providers=['codex'], board='guition-p4', port='COM6'), root)
+            child = Mock(); child.poll.return_value = None
+            with patch.object(control.list_ports, 'comports', return_value=[Mock(device='COM4', vid=0x303a), Mock(device='COM6', vid=0x303a)]), \
+                    patch.object(control, 'stop_host'), patch.object(control.subprocess, 'Popen', return_value=child), \
+                    patch.object(control.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
+                control.start_host(root)
     def test_frozen_host_outlives_menu_using_independent_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

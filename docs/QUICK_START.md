@@ -13,6 +13,10 @@ Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare
 
 When you choose Codex, setup offers the official CLI installer and its sign-in flow automatically when needed. Accept the offered steps with your own account; [Codex setup guide](CODEX_SETUP.md). Desktop-app login alone may not supply the CLI login file used by this companion. Setup never asks for your OpenAI password or copies login credentials. ZCode quota requires your own Z.AI coding-plan key; ZCode's encrypted login is not imported. See [provider configuration](../README.md#provider-setup).
 
+**More than one USB board connected?** Choose the display's explicit COM port instead of `auto`, save settings, then start the host. Automatic detection deliberately refuses to guess between matching devices. A running background process alone does not mean USB is connected; check **Host log** for `connected to ...` and acknowledged frames. If no matching device is connected yet, the host can wait for it.
+
+**Moving from a source or portable folder to the installer?** Each folder keeps its own private configuration. Choose your board, providers and port in the installed app, and add your own ZCode key there if you need quota. An existing key in another folder is not imported automatically.
+
 ## Personalize the display
 
 Tap **SET**, then **APPEARANCE**. Select NOVA or ORBIT and a Forest/Ocean/Amethyst/Ember theme. Use DONE, then BACK. Choices are stored on the display and survive application updates/reboots. A first factory installation resets device settings. If SAVE FAILED appears, the selection is temporary; retry before restarting.

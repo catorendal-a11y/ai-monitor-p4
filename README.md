@@ -57,6 +57,12 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 
 **Two board choices · Two animated robots · Four color themes · No AI preselected · Portable Windows setup**
 
+## Watch the two-minute overview
+
+[![Watch AI Monitor: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
+
+**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual UI, and learn how USB, provider setup, quota windows, themes and the Windows app fit together. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+
 ## Meet your desk companion
 
 | NOVA | ORBIT with the Ocean theme |
@@ -98,7 +104,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.16.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.16.1-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
-3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
+3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
 5. **Start the companion.** Firmware installation offers to start the host automatically after success; otherwise click **Start host**. Close the window; the host keeps running invisibly while the display remains connected. Sign-out or shutting down the PC stops it.
 
