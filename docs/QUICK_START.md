@@ -4,8 +4,8 @@
 
 Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). No Python, PlatformIO, Node.js or Git installation is needed for this package.
 
-1. Open **Releases** and download **AI-Monitor-Setup-v1.16.1-windows.exe**. It installs the complete app for your user and opens setup. No administrator access or separate Python installation is required. The release is unsigned; [read the Windows trust notes](WINDOWS_TRUST.md) if SmartScreen warns.
-2. For a portable installation instead, download **ai-monitor-p4-v1.16.1-windows.zip** and use **Extract All**. Keep the entire folder, including **_internal**, together. Do not run inside the ZIP. GitHub's **Source code (zip)** contains no ready-to-run programs.
+1. Open **Releases** and download **AI-Monitor-Setup-v1.17.0-windows.exe**. It installs the complete app for your user and opens setup. No administrator access or separate Python installation is required. The release is unsigned; [read the Windows trust notes](WINDOWS_TRUST.md) if SmartScreen warns.
+2. For a portable installation instead, download **ai-monitor-p4-v1.17.0-windows.zip** and use **Extract All**. Keep the entire folder, including **_internal**, together. Do not run inside the ZIP. GitHub's **Source code (zip)** contains no ready-to-run programs.
 3. Connect the screen's USB data port and double-click **AI-Monitor.exe**.
 4. In **Setup**, choose your exact board, providers and USB port. Read the visible instructions for each AI. Codex offers official CLI setup/sign-in; ZCode quota needs your own Z.AI Coding Plan key in the masked field. Without that key, ZCode can still report local activity. Click **Save settings**. A blank key field preserves the saved key; **Clear saved key** removes it. Neither board nor AI is preselected on a fresh installation.
 5. For a new board, open **Firmware > Install / update firmware** and choose **First installation**. Review the board/port and type `FLASH`. This resets display settings. For an existing AI Monitor, choose **Update this project's existing installation** to retain settings and enable the new quota selector/large alerts. A new S3 board needs its own factory installation. Progress and errors remain in **Activity**; keep the app and power connected until it finishes.
@@ -63,3 +63,21 @@ The source menu can configure and start/stop the companion. A Windows portable p
 | Source setup cannot find Python | Use the portable Windows release, or install Python 3.10+ and retry AI-Monitor.bat. |
 
 The host log is local at `tools/aim_host.log`. Never post keys, authentication files or unredacted private data in issues.
+
+## Connection checks and host preferences
+
+Use **Check connection** after saving the exact board and USB port. It reads the existing AI Monitor identity without flashing or requesting quota. A factory demo needs firmware installation first. With a running host, the app uses its fresh health report; stop the host to probe an unconfirmed connection.
+
+The sidebar distinguishes **USB CONNECTED**, **USB RECONNECTING**, **WAITING FOR USB SELECTION**, and a running process with **USB STATUS UNCONFIRMED**. An ACK proves that the display received a frame; it does not prove that Codex or ZCode reported quota. **Host settings > Live provider health** shows this separately. Use Host log and Provider setup for account errors.
+
+| Host setting | Range/default | Effect |
+| --- | --- | --- |
+| Retry USB connection | 2–60 seconds / 5 | How soon the host retries a missing or disconnected display. |
+| Read local token activity | 2–15 seconds / 2 | Read-only numeric activity scanning, independent of quota polling. |
+| Terminal text size | 10–18 pt / 10 | Larger desktop activity/log text. |
+| Start host when app opens | Off | Opt-in background start after saved setup is validated; no Windows sign-in task. |
+| Keep host when app closes | On | Turn off to stop this installation's host before the app closes. |
+
+Click **Save settings** to apply preferences. Quota refresh remains 15–240 seconds in Setup, with separate provider backoff on failures/rate limiting. Reading status does not generate prompts or consume model tokens.
+
+An invalid configuration no longer prevents opening the app. **Host settings > Recover invalid settings** offers an explicit reset and keeps a private `tools/aim_host.invalid-*.json` backup. Re-enter the board/providers/key after recovery; keep the backup private. Updating an installer preserves valid configuration and never imports credentials from an unrelated portable folder.

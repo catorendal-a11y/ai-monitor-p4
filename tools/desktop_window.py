@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 import time
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, QSignalBlocker
 from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap, QShortcut, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
@@ -24,8 +24,9 @@ import desktop_support as desktop
 from board_profiles import BOARDS, get_board
 from host_security import safe_text
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
+from host_status import read_status
 
-APP_VERSION = 'v1.16.1'
+APP_VERSION = 'v1.17.0'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''
@@ -49,6 +50,10 @@ QPushButton:disabled { color: #a5b5bd; background: #20303a; border-color: #30444
 QLineEdit, QComboBox, QSpinBox { background: #0c161d; border: 1px solid #4b6875;
                               border-radius: 7px; padding: 8px; min-height: 22px; }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 2px solid #70e6ae; }
+QSpinBox::up-button, QSpinBox::down-button { background: #294451; width: 24px; border-left: 1px solid #4b6875; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: #426372; }
+QSpinBox::up-arrow { image: url(SPIN_UP_IMAGE); width: 10px; height: 6px; }
+QSpinBox::down-arrow { image: url(SPIN_DOWN_IMAGE); width: 10px; height: 6px; }
 QComboBox QAbstractItemView { background: #182831; selection-background-color: #285742; }
 QCheckBox { spacing: 10px; padding: 5px 0; background: transparent; }
 QCheckBox:focus { background: #25453e; border-radius: 5px; }
@@ -167,7 +172,15 @@ class MonitorWindow(QMainWindow):
         self.secrets = []
         self.previous_log = None
         self.token_reporter = None
-        self.config = desktop.load_settings(root)
+        self.close_after_stop = False
+        self.close_stop_completed = False
+        self.recover_after_action = False
+        self.config_error = False
+        try:
+            self.config = desktop.load_settings(root)
+        except (ValueError, OSError):
+            self.config_error = True
+            self.config = dict(control.host.DEFAULT_CONFIG)
         self._remember_secrets()
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(1)
@@ -175,11 +188,15 @@ class MonitorWindow(QMainWindow):
         self.setWindowIcon(QIcon(str(ASSETS / 'nova-icon.png')))
         self.resize(1200, 900)
         self.setMinimumSize(1040, 760)
-        self.setStyleSheet(STYLE.replace('CHECK_IMAGE', (ASSETS/'checked.png').as_posix()))
+        self.setStyleSheet(STYLE.replace('CHECK_IMAGE', (ASSETS/'checked.png').as_posix())
+                          .replace('SPIN_UP_IMAGE', (ASSETS/'spin-up.png').as_posix())
+                          .replace('SPIN_DOWN_IMAGE', (ASSETS/'spin-down.png').as_posix()))
         self.ready_image = QPixmap(str(ASSETS / 'nova-done.png'))
         self.work_image = QPixmap(str(ASSETS / 'nova-work.png'))
         self._build()
         self._load_fields()
+        if self.config_error:
+            self.notice.setText('Local settings could not be loaded. Your file was preserved. Use Recover settings in Host settings.')
         self.append_output('Welcome. Choose your board and AI providers, then save settings.')
         self.append_output('The monitor reads usage records and quota status. It does not generate AI requests.')
         shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
@@ -190,6 +207,8 @@ class MonitorWindow(QMainWindow):
         if monitor:
             self.refresh_status()
             self.timer.start()
+            if self.config['start_host_on_open'] and self.config.get('board') and self.config['providers']:
+                QTimer.singleShot(0, self.start)
 
     def _remember_secrets(self):
         for value in (self.config.get('zai_key', ''), os.environ.get('ZAI_API_KEY', '')):
@@ -255,6 +274,7 @@ class MonitorWindow(QMainWindow):
         right.addWidget(self.progress)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._setup_tab(), 'Setup')
+        self.tabs.addTab(self._preferences_tab(), 'Host settings')
         self.tabs.addTab(self._firmware_tab(), 'Firmware')
         self.tabs.addTab(self._help_tab(), 'Help')
         right.addWidget(self.tabs, 1)
@@ -316,6 +336,7 @@ class MonitorWindow(QMainWindow):
         self.port.setMinimumContentsLength(7)
         self.port.setAccessibleName('USB serial port')
         self.rescan_button = self._button('Rescan USB', self.rescan)
+        self.check_usb_button = self._button('Check connection', self.check_connection)
         fields.addWidget(label('Display board'), 0, 0)
         fields.addWidget(label('USB port'), 0, 1)
         fields.addWidget(self.board, 1, 0)
@@ -326,6 +347,9 @@ class MonitorWindow(QMainWindow):
         fields.setColumnStretch(0, 3)
         fields.setColumnStretch(1, 2)
         form.addLayout(fields)
+        self.usb_help = label('', 'muted', True)
+        form.addWidget(self.usb_help)
+        form.addWidget(self.check_usb_button)
         self.board_help = label('', 'muted', True)
         form.addWidget(self.board_help)
         form.addWidget(label('CHOOSE YOUR AI PROVIDERS', 'eyebrow'))
@@ -387,6 +411,44 @@ class MonitorWindow(QMainWindow):
         scroll.setWidget(content)
         return scroll
 
+    def _preferences_tab(self):
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(8, 20, 8, 15)
+        layout.addWidget(label('Background host preferences', 'headline'))
+        layout.addWidget(label('Save settings to apply changes. USB recovery and token reads run independently of quota refresh. '
+                               'A connected display does not guarantee that an AI account can report quota.', 'muted', True))
+        self.reconnect = QSpinBox(); self.reconnect.setRange(2, 60); self.reconnect.setSuffix(' sec')
+        self.reconnect.setAccessibleName('USB reconnect interval in seconds')
+        self.token_poll = QSpinBox(); self.token_poll.setRange(2, 15); self.token_poll.setSuffix(' sec')
+        self.token_poll.setAccessibleName('Local token read interval in seconds')
+        self.log_size = QSpinBox(); self.log_size.setRange(10, 18); self.log_size.setSuffix(' pt')
+        self.log_size.setAccessibleName('Terminal font size')
+        grid = QGridLayout()
+        for row, (caption, field) in enumerate((('Retry USB connection', self.reconnect),
+                ('Read local token activity', self.token_poll), ('Terminal text size', self.log_size))):
+            text = label(caption); text.setBuddy(field)
+            grid.addWidget(text, row, 0); grid.addWidget(field, row, 1)
+            field.valueChanged.connect(self._changed)
+        layout.addLayout(grid)
+        self.auto_start = QCheckBox('Start the host when this app opens')
+        self.keep_host = QCheckBox('Keep the host running when I close this app')
+        for field in (self.auto_start, self.keep_host):
+            field.toggled.connect(self._changed); layout.addWidget(field)
+        layout.addWidget(label('Automatic start is opt-in and applies when you open AI Monitor. It does not install a Windows service '
+                               'or add a sign-in task. USB choices are still validated before starting.', 'muted', True))
+        self.provider_health = label('Start the host to see provider health. Token activity and account quota are separate.', 'muted', True)
+        layout.addWidget(label('LIVE PROVIDER HEALTH', 'eyebrow'))
+        layout.addWidget(self.provider_health)
+        self.recover_button = self._button('Recover invalid settings…', self.recover_settings)
+        self.recover_button.setVisible(self.config_error)
+        layout.addWidget(self.recover_button)
+        layout.addWidget(label('Private settings stay in this installation folder. Updating this installer preserves them; '
+                               'a portable copy in another folder uses its own settings. No keys are exported to GitHub.', 'muted', True))
+        layout.addStretch()
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(content)
+        return scroll
+
     def _firmware_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -429,6 +491,12 @@ class MonitorWindow(QMainWindow):
         for key, checkbox in self.providers.items():
             checkbox.setChecked(key in self.config['providers'])
         self.interval.setValue(self.config['interval_s'])
+        self.reconnect.setValue(self.config['reconnect_s'])
+        self.token_poll.setValue(self.config['token_poll_s'])
+        self.log_size.setValue(self.config['log_font_size'])
+        self.auto_start.setChecked(self.config['start_host_on_open'])
+        self.keep_host.setChecked(self.config['keep_host_on_close'])
+        self._apply_preferences()
         self.unsaved = False
         self._changed(mark=False)
         self.notice.setText('Saved setup loaded. Start the host when your display is connected.'
@@ -469,11 +537,23 @@ class MonitorWindow(QMainWindow):
 
     def rescan(self):
         current = self.port.currentText() or self.config['port']
-        self.port.clear()
-        self.port.addItem('auto')
-        for item in sorted(control.list_ports.comports(), key=lambda p: p.device):
-            self.port.addItem(safe_text(item.device))
-        self.port.setCurrentText(current)
+        with QSignalBlocker(self.port):
+            self.port.clear()
+            self.port.addItem('auto')
+            try:
+                ports = sorted(control.list_ports.comports(), key=lambda p: p.device)
+            except OSError:
+                self.usb_help.setText('USB scan unavailable. Enter your explicit port and check the connection.')
+                self.port.setCurrentText(current)
+                return
+            for item in ports:
+                self.port.addItem(safe_text(item.device))
+                self.port.setItemData(self.port.count()-1, safe_text(item.description), Qt.ItemDataRole.ToolTipRole)
+            self.port.setCurrentText(current)
+        descriptions = [safe_text(item.device + ': ' + item.description, 100) for item in ports]
+        self.usb_help.setText(('Available: ' + ' | '.join(descriptions) + '\nAuto requires exactly one matching USB device. '
+                              'With several devices, select the display port explicitly.') if ports else
+                             'No USB ports found. Connect a USB data cable, then Rescan USB. Your saved port is preserved.')
 
     def _error(self, text: str):
         self.notice.setText(text)
@@ -483,11 +563,17 @@ class MonitorWindow(QMainWindow):
     def save(self):
         if self.busy:
             return
+        if self.config_error:
+            self._error('Recover the invalid local configuration in Host settings before saving. The original file is preserved.')
+            return
         previous_providers = self.config['providers']
         try:
             self.config = desktop.save_settings(self.root, self.board.currentData(),
                 [key for key, checkbox in self.providers.items() if checkbox.isChecked()],
-                self.port.currentText(), self.interval.value(), self.key.text(), self.clear_key.isChecked())
+                self.port.currentText(), self.interval.value(), self.key.text(), self.clear_key.isChecked(),
+                options={'reconnect_s': self.reconnect.value(), 'token_poll_s': self.token_poll.value(),
+                         'log_font_size': self.log_size.value(), 'start_host_on_open': self.auto_start.isChecked(),
+                         'keep_host_on_close': self.keep_host.isChecked()})
         except (control.SetupError, ValueError, OSError):
             self._error('Choose a supported board, at least one provider and a valid USB port. '
                         'API keys must be a single printable token. Nothing was saved.')
@@ -497,6 +583,7 @@ class MonitorWindow(QMainWindow):
         self.clear_key.setChecked(False)
         self.unsaved = False
         self.token_reporter = None
+        self._apply_preferences()
         self.notice.setText('Settings saved. Existing keys were preserved unless you explicitly changed or cleared them.')
         self.append_output('Settings saved. Board: ' + get_board(self.config['board']).name)
         if 'codex' in self.config['providers'] and 'codex' not in previous_providers:
@@ -509,7 +596,7 @@ class MonitorWindow(QMainWindow):
                 self.integrations()
 
     def _ready(self):
-        if self.unsaved or not self.config.get('board') or not self.config['providers']:
+        if self.config_error or self.unsaved or not self.config.get('board') or not self.config['providers']:
             self._error('Save your display board and AI providers in Setup first.')
             return False
         return not self.busy
@@ -519,7 +606,7 @@ class MonitorWindow(QMainWindow):
             return
         self.busy = True
         for button in (self.start_button, self.stop_button, self.save_button,
-                       self.flash_button, self.integration_button, self.rescan_button):
+                       self.flash_button, self.integration_button, self.rescan_button, self.check_usb_button):
             button.setEnabled(False)
         self.tabs.setEnabled(False)
         self.progress.show()
@@ -535,14 +622,27 @@ class MonitorWindow(QMainWindow):
         self.progress.hide()
         self.tabs.setEnabled(True)
         for button in (self.start_button, self.stop_button, self.save_button,
-                       self.flash_button, self.integration_button, self.rescan_button):
+                       self.flash_button, self.integration_button, self.rescan_button, self.check_usb_button):
             button.setEnabled(True)
         self.notice.setText(message)
         self.append_output(message)
         self.worker = None
         if not success:
             QMessageBox.warning(self, 'Action could not finish', message)
+        if self.recover_after_action:
+            self.recover_after_action = False
+            if success:
+                self.config = desktop.load_settings(self.root)
+                self.config_error = False
+                self.recover_button.hide()
+                self._load_fields()
+                self.append_output('Settings reset. The original file was backed up locally; keep that backup private.')
         self.refresh_status()
+        if self.close_after_stop:
+            self.close_after_stop = False
+            if success:
+                self.close_stop_completed = True
+                self.close()
 
     def start(self):
         if self._ready():
@@ -550,6 +650,25 @@ class MonitorWindow(QMainWindow):
 
     def stop(self):
         self._run('Stopping host', lambda emit: control.stop_host(self.root))
+
+    def check_connection(self):
+        if self._ready():
+            self._run('Checking USB identity', lambda emit: desktop.check_connection(self.root, emit))
+
+    def recover_settings(self):
+        if self.busy or not self.config_error: return
+        answer = QMessageBox.question(self, 'Recover local settings',
+            'Keep a private backup of the original file, stop this installation\'s host and reset setup? '
+            'You will choose your board/providers and enter your API key again. The backup stays on this PC.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes: return
+        self.recover_after_action = True
+        self._run('Recovering local settings', lambda emit: desktop.reset_invalid_settings(self.root))
+
+    def _apply_preferences(self):
+        for box in (self.activity, self.host_log):
+            box.setStyleSheet('QPlainTextEdit { font-family: "Consolas"; font-size: ' +
+                              str(self.config['log_font_size']) + 'pt; }')
 
     def integrations(self):
         if not self._ready():
@@ -570,7 +689,10 @@ class MonitorWindow(QMainWindow):
         kind = operation.kind.currentData()
         try:
             port, _command = desktop.prepare_flash(self.root, board_id, kind)
-        except (control.SetupError, ValueError, OSError):
+        except control.SetupError as error:
+            self._error(str(error))
+            return
+        except (ValueError, OSError):
             self._error('Firmware verification or USB selection failed. Check the selected board and extract the complete release package.')
             return
         confirm = ConfirmFlashDialog(board_id, port, kind, self)
@@ -597,8 +719,16 @@ class MonitorWindow(QMainWindow):
 
     def refresh_status(self):
         try:
-            running = bool(control.owned_hosts(self.root))
-            self.host_state.setText('HOST RUNNING' if running else 'HOST STOPPED')
+            processes = control.owned_hosts(self.root)
+            running = bool(processes)
+            self.host_state.setText(desktop.connection_summary(self.root, processes))
+            health = read_status(self.root, {process.pid for process in processes})
+            states = health.get('providers', {}) if health else {}
+            captions = {'ready': 'quota received', 'unavailable': 'quota unavailable — check Host log / Provider setup',
+                        'activity_only': 'activity only; no account quota'}
+            self.provider_health.setText('\n'.join(PROVIDERS[key][0] + ': ' + captions.get(states.get(key),
+                'waiting for quota status' if running else 'host stopped') for key in self.config['providers']) or
+                'Choose your AI providers in Setup.')
             text = desktop.recent_log(self.root, tuple(self.secrets))
             if text != self.previous_log:
                 scrollbar = self.host_log.verticalScrollBar()
@@ -609,6 +739,7 @@ class MonitorWindow(QMainWindow):
                 self.previous_log = text
             if self.token_reporter is None:
                 self.token_reporter = control.host.TokenReporter(providers=self.config['providers'], activity_dir=self.root/'tools/activity')
+                self.token_reporter.poll_seconds = self.config['token_poll_s']
             sample = self.token_reporter.poll()
             if sample:
                 if not sample['known']:
@@ -627,6 +758,17 @@ class MonitorWindow(QMainWindow):
             self.notice.setText('Wait for the current action to finish before closing this window.')
             event.ignore()
             return
+        if self.unsaved:
+            answer = QMessageBox.question(self, 'Unsaved settings', 'Close without saving your changes?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                event.ignore(); return
+            self.unsaved = False
+        if not self.config['keep_host_on_close'] and not self.close_stop_completed:
+            self.close_after_stop = True
+            event.ignore()
+            self.stop()
+            return
         self.timer.stop()
         event.accept()  # The independent background host is deliberately left running.
 
@@ -643,6 +785,6 @@ def run_desktop(firmware: bool = False) -> int:
             'Repair the local tools/aim_host.json file or extract a fresh package. Your file was not changed.')
         return 1
     if firmware:
-        window.tabs.setCurrentIndex(1)
+        window.tabs.setCurrentIndex(2)
     window.show()
     return application.exec()

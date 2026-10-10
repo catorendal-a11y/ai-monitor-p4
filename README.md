@@ -1,4 +1,4 @@
-# AI Monitor — ESP32-P4 and ESP32-S3 AI Desk Companion
+# AI Monitor â€” ESP32-P4 and ESP32-S3 AI Desk Companion
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
@@ -49,19 +49,19 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 
 *Quota needs the provider's supported account/key/bridge. Gemini and external numeric bridges report activity only. S3 remains experimental. Windows binaries are currently unsigned.*
 
-[![Support AI Monitor — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
+[![Support AI Monitor â€” give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
 
-**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
+**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest)** Â· [Quick Start](docs/QUICK_START.md) Â· [Provider setup](docs/PROVIDERS.md) Â· [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
-**Two board choices · Two animated robots · Four color themes · No AI preselected · Portable Windows setup**
+**Two board choices Â· Two animated robots Â· Four color themes Â· No AI preselected Â· Portable Windows setup**
 
 ## Watch the two-minute overview
 
 [![Watch AI Monitor: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
 
-**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual UI, and learn how USB, provider setup, quota windows, themes and the Windows app fit together. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** â€” Meet NOVA and ORBIT, see the actual UI, and learn how USB, provider setup, quota windows, themes and the Windows app fit together. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
 
 ## Meet your desk companion
 
@@ -100,9 +100,11 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 [Preview the ZCode setup instructions and masked key field](docs/media/desktop-provider-guide.png).
 
+**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start when opening the app, and whether closing the app stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
+
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.16.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.16.1-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.17.0-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.17.0-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -110,7 +112,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.1/AI-Monitor-Setup-v1.16.1-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.1/ai-monitor-p4-v1.16.1-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.1/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.0/AI-Monitor-Setup-v1.17.0-windows.exe)** Â· [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.0/ai-monitor-p4-v1.17.0-windows.zip) Â· [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.17.0/SHA256SUMS.txt) Â· [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 
@@ -199,7 +201,7 @@ The PC companion reads selected local usage sources, queries provider quota over
 
 No maintainer credentials are included in the source or release. Your optional Z.AI key is stored in plaintext in local `tools/aim_host.json`, which is ignored by Git; keep that file private. `ZAI_API_KEY` in the process environment takes precedence. The host does not automatically load `.env` files. Windows executables are currently unsigned; obtain the ZIP and checksum from this repository's release page.
 
-[Security and private reporting](SECURITY.md) · [Host security review](docs/SECURITY_REVIEW.md) · [GitHub safeguards](docs/GITHUB_SECURITY.md)
+[Security and private reporting](SECURITY.md) Â· [Host security review](docs/SECURITY_REVIEW.md) Â· [GitHub safeguards](docs/GITHUB_SECURITY.md)
 
 ## Run from source or contribute
 
@@ -216,6 +218,6 @@ sh setup.sh
 
 Firmware builds, serial permissions and test dependencies are covered in the [developer guide](docs/DEVELOPMENT.md). The [release guide](docs/RELEASING.md) explains the separate build/publish jobs and reviewed draft releases. Ordinary source pushes do not publish a release.
 
-[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases)
+[Contributing](CONTRIBUTING.md) Â· [Provider roadmap](docs/PROVIDER_ROADMAP.md) Â· [All releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases)
 
 Project-owned code and original NOVA/ORBIT artwork use [MIT](LICENSE). Drivers, dependencies, fonts and provider marks retain their own terms: [third-party notices](THIRD_PARTY_NOTICES.md), [NOVA/logo sources](assets/nova/SOURCES.md) and [ORBIT artwork](assets/orbit/SOURCES.md). This is an independent project and is not endorsed by its AI providers.

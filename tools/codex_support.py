@@ -21,7 +21,18 @@ def codex_command():
     install = os.environ.get('CODEX_INSTALL_DIR')
     if install: candidates += [str(Path(install) / ('codex.exe' if os.name == 'nt' else 'codex'))]
     if os.name == 'nt':
-        candidates += [str(Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'Programs/OpenAI/Codex/bin/codex.exe')]
+        local = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local'))
+        candidates += [str(local / 'Programs/OpenAI/Codex/bin/codex.exe')]
+        # Explorer-launched apps may inherit PATH from before CLI installation.
+        # Search only known per-user install locations, never the working folder.
+        native = local / 'OpenAI/Codex/bin'
+        try:
+            versions = sorted(native.glob('*/codex.exe'), key=lambda item: item.stat().st_mtime, reverse=True)[:32]
+            candidates += [str(item) for item in versions]
+        except OSError:
+            pass
+        roaming = Path(os.environ.get('APPDATA', Path.home() / 'AppData/Roaming'))
+        candidates += [str(roaming / 'npm/codex.cmd')]
     else:
         candidates += [str(Path.home() / '.local/bin/codex')]
     for candidate in candidates:
@@ -112,7 +123,7 @@ def read_rate_limits(command, timeout=20):
             if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
             return message['result']
     try:
-        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.16.1'}}})
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.17.0'}}})
         response(1); send({'method':'initialized','params':{}})
         send({'method':'account/rateLimits/read','id':2})
         return response(2)

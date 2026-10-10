@@ -294,13 +294,13 @@ class LoopTests(unittest.TestCase):
         with patch.object(host, "find_port", return_value="COM_TEST"), \
                 patch.object(host, "connect_panel", side_effect=[first, second]) as connect, \
                 patch.object(host, "fetch_codex", side_effect=[(rows, None), KeyboardInterrupt]), \
-                patch.object(host.time, "sleep") as sleep, patch.object(host, "LOG"):
+                patch.object(host, "wait_for_config") as sleep, patch.object(host, "LOG"):
             with self.assertRaises(KeyboardInterrupt):
                 host._run_loop(host.DEFAULT_CONFIG, 60, "", ["codex"])
         self.assertEqual(connect.call_count, 2)
         first.close.assert_called_once()
         second.close.assert_called_once()
-        sleep.assert_called_once_with(5)
+        self.assertEqual(sleep.call_args.args[1], 5)
 
     def test_provider_error_is_sent_as_notice_and_receives_ack(self):
         serial = FakeSerial([b'{"type":"ack","frameId":101}\n'])

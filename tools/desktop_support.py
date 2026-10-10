@@ -9,18 +9,39 @@ import aim_control as control
 from board_profiles import get_board
 from host_security import safe_text, serial_port
 from provider_catalog import selected_providers
+from host_status import validate_options, read_status
 
 
 def load_settings(root: Path) -> dict:
     config = control.local_config(root)
+    validate_options(config)
     if type(config['interval_s']) is not int or not 15 <= config['interval_s'] <= 240:
         raise control.SetupError('Invalid refresh interval in local configuration.')
     control.host.credential(config['zai_key'], optional=True)
     return config
 
 
+def reset_invalid_settings(root: Path) -> None:
+    """Explicit recovery only: keep the original private bytes in a local backup."""
+    try:
+        load_settings(root)
+    except (ValueError, OSError):
+        pass
+    else:
+        raise control.SetupError('Settings are valid; recovery is unnecessary.')
+    source = root / 'tools/aim_host.json'
+    with source.open('rb') as stream:
+        raw = stream.read(65537)
+    if len(raw) > 65536: raise control.SetupError('Configuration is too large for safe recovery. Repair it locally.')
+    backup = source.with_name('aim_host.invalid-' + str(time.time_ns()) + '.json')
+    with backup.open('xb') as stream:
+        stream.write(raw)
+    control.stop_host(root)
+    control.save_config(dict(control.host.DEFAULT_CONFIG), root)
+
+
 def save_settings(root: Path, board: str, providers: list[str], port: str,
-                  interval: int, key: str = '', clear_key: bool = False) -> dict:
+                  interval: int, key: str = '', clear_key: bool = False, options=None) -> dict:
     get_board(board)
     config = load_settings(root)
     choices = selected_providers({'providers': providers})
@@ -33,6 +54,12 @@ def save_settings(root: Path, board: str, providers: list[str], port: str,
         raise control.SetupError('Invalid key settings. Nothing was saved.')
     updated = dict(config, board=board, providers=choices, port=port,
                    interval_s=interval, zai_provider='zcode')
+    if options is not None:
+        from host_status import OPTIONS, FLAGS
+        if not isinstance(options, dict) or set(options) - (set(OPTIONS) | set(FLAGS)):
+            raise control.SetupError('Unknown host preference. Nothing was saved.')
+        updated.update(options)
+    validate_options(updated)
     if clear_key:
         updated['zai_key'] = ''
     elif key.strip():
@@ -42,6 +69,48 @@ def save_settings(root: Path, board: str, providers: list[str], port: str,
             raise control.SetupError('Use a single printable API key. Nothing was saved.') from None
     control.save_config(updated, root)
     return updated
+
+
+def connection_summary(root: Path, processes) -> str:
+    if not processes: return 'HOST STOPPED'
+    status = read_status(root, {process.pid for process in processes})
+    if not status: return 'HOST RUNNING • USB STATUS UNCONFIRMED'
+    state = status['state']
+    port = safe_text(status.get('port', ''), 64)
+    return {'starting': 'HOST STARTING', 'waiting_usb': 'WAITING FOR USB SELECTION',
+            'connecting': f'CONNECTING • {port}', 'connected': f'USB CONNECTED • {port}',
+            'reconnecting': f'USB RECONNECTING • {port}', 'stopped': 'HOST STOPPING',
+            'error': 'HOST ERROR • CHECK LOG'}[state]
+
+
+def check_connection(root: Path, emit) -> None:
+    """Read device identity; no flash, quota requests or settings mutation."""
+    config = load_settings(root)
+    board = get_board(config['board'])
+    processes = control.owned_hosts(root)
+    if processes:
+        status = read_status(root, {process.pid for process in processes})
+        if (status and status['state'] == 'connected' and status.get('board') == board.id
+                and config['port'] in ('auto', status['port'])):
+            emit('The host has a verified USB connection on ' + status['port'] + '.')
+            return
+        raise control.SetupError('The host is running but USB is not confirmed. Stop host before checking the display; then select its port and retry.')
+    port = control.host.find_port(config['port'], board.id)
+    if not port: raise control.SetupError('Choose an explicit display port in Setup, save settings and retry. Use a USB data cable.')
+    panel = None
+    try:
+        panel = control.host.Panel(port)
+        time.sleep(0.5)
+        panel.send_line('{"cmd":"get_info"}')
+        info = panel.wait_for('info')
+        from board_profiles import matches_info
+        if not matches_info(board, info):
+            raise control.SetupError('This port does not report the selected AI Monitor board. Check the port and board; a new factory display needs firmware installation.')
+        emit('Verified AI Monitor display: ' + board.name + ' on ' + port + '. No firmware or settings were changed.')
+    except (TimeoutError, OSError, RuntimeError, control.host.serial.SerialException):
+        raise control.SetupError('The display did not respond. Check its USB data port/cable, close other serial tools, or install firmware on a new board.') from None
+    finally:
+        if panel is not None: panel.close()
 
 
 def recent_log(root: Path, secrets: tuple[str, ...] = ()) -> str:

@@ -24,7 +24,7 @@ def verify_package(package: Path) -> str:
     if actual != expected:
         raise ValueError('Unreviewed files in package')
     for file in actual:
-        if file.name in {'aim_host.json', 'aim_host.log', 'auth.json', 'credentials.json'} or file.suffix in {'.db', '.sqlite', '.jsonl', '.lnk'}:
+        if file.name.startswith('aim_host.invalid-') or file.name in {'aim_host.json', 'aim_host.status.json', 'aim_host.log', 'auth.json', 'credentials.json'} or file.suffix in {'.db', '.sqlite', '.jsonl', '.lnk'}:
             raise ValueError('Private runtime file in package')
     for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll'):
         if not (package/name).is_file():

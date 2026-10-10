@@ -84,7 +84,7 @@ def main():
             raise RuntimeError('Private/generated path in tracked release source')
         if relative.parts[:2] == ('tools', 'activity'):
             raise RuntimeError('Runtime activity records must not be exported')
-        if relative.name in {'aim_host.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
+        if relative.name.startswith('aim_host.invalid-') or relative.name in {'aim_host.json', 'aim_host.status.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
                 (relative.name.startswith('.env.') and relative.name != '.env.example') or \
                 relative.suffix in {'.log', '.db', '.sqlite', '.sqlite3', '.jsonl', '.lock', '.bin', '.exe', '.lnk', '.pem', '.key'}:
             raise RuntimeError('Private/generated file in tracked release source')

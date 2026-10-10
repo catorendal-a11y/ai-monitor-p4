@@ -118,8 +118,13 @@ class DesktopWindowTests(unittest.TestCase):
         self.window = MonitorWindow(self.root, monitor=False)
         self.window.show()
         self.application.processEvents()
-        self.addCleanup(self.window.close)
+        self.addCleanup(self.close_window)
         self.addCleanup(self.window.deleteLater)
+
+    def close_window(self):
+        self.window.unsaved = False
+        self.window.config['keep_host_on_close'] = True
+        self.window.close()
 
     def test_fresh_ui_has_no_selections_and_contains_nova(self):
         self.assertEqual(self.window.board.currentData(), '')
@@ -154,6 +159,52 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertEqual(config['port'],'COM7')
         self.assertFalse(self.window.unsaved)
         self.assertIn('EXPERIMENTAL',self.window.board_help.text())
+
+    def test_host_preferences_save_and_reload_without_exposing_a_key(self):
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['gemini'].setChecked(True)
+        self.window.reconnect.setValue(12); self.window.token_poll.setValue(8)
+        self.window.log_size.setValue(14); self.window.keep_host.setChecked(False)
+        self.window.auto_start.setChecked(True); self.window.save()
+        config = desktop.load_settings(self.root)
+        self.assertEqual(config['reconnect_s'], 12); self.assertEqual(config['token_poll_s'], 8)
+        self.assertTrue(config['start_host_on_open']); self.assertFalse(config['keep_host_on_close'])
+        self.assertEqual(self.window.activity.font().pointSize(), 14)
+        self.window.config['keep_host_on_close'] = True
+        with patch.object(control, 'start_host') as start:
+            other = MonitorWindow(self.root, monitor=False)
+            self.assertEqual(other.reconnect.value(), 12)
+            start.assert_not_called()
+            other.config['keep_host_on_close'] = True; other.close(); other.deleteLater()
+
+    def test_rescan_preserves_explicit_selection_and_does_not_mark_saved_setup_dirty(self):
+        self.window.port.setCurrentText('COM6'); self.window.unsaved = False
+        with patch.object(control.list_ports, 'comports', return_value=[Mock(device='COM4', description='Other ESP32')]):
+            self.window.rescan()
+        self.assertEqual(self.window.port.currentText(), 'COM6'); self.assertFalse(self.window.unsaved)
+        self.assertIn('COM4', self.window.usb_help.text())
+        self.assertIn('explicitly', self.window.usb_help.text())
+
+    def test_invalid_config_opens_recovery_ui_without_overwriting_file(self):
+        self.window.close()
+        (self.root/'tools').mkdir(exist_ok=True)
+        file = self.root/'tools/aim_host.json'; file.write_text('{broken')
+        other = MonitorWindow(self.root, monitor=False)
+        self.assertTrue(other.config_error); self.assertFalse(other.recover_button.isHidden())
+        self.assertEqual(file.read_text(), '{broken')
+        with patch.object(QMessageBox, 'warning'), patch.object(desktop, 'save_settings') as save:
+            other.save()
+        save.assert_not_called(); other.close(); other.deleteLater()
+
+    def test_close_can_keep_unsaved_form_and_opt_in_to_stop_host(self):
+        self.window.unsaved = True
+        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No):
+            event=QCloseEvent(); self.window.closeEvent(event); self.assertFalse(event.isAccepted())
+        self.window.unsaved = False; self.window.config['keep_host_on_close'] = False
+        with patch.object(self.window, '_run') as run:
+            event=QCloseEvent(); self.window.closeEvent(event); self.assertFalse(event.isAccepted())
+        self.assertTrue(self.window.close_after_stop); self.assertEqual(run.call_args.args[0], 'Stopping host')
+        self.window.close_after_stop = False
 
     def test_existing_key_is_not_loaded_into_the_visible_password_field(self):
         self.window.close()

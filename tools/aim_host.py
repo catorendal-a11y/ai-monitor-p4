@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter
+from host_status import HostStatus, OPTIONS, FLAGS, validate_options
 from provider_catalog import selected_providers, PROVIDERS
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
@@ -119,6 +120,8 @@ DEFAULT_CONFIG = {
     "zai_key": "",        # paste a Z.AI coding plan API key here to enable Z CODE
     "zai_provider": "zcode"
 }
+DEFAULT_CONFIG.update({key: value[2] for key, value in OPTIONS.items()})
+DEFAULT_CONFIG.update(FLAGS)
 
 
 LOCK_PATH = HERE / "aim_host.lock"
@@ -177,6 +180,7 @@ def load_config():
     out["providers"] = selected_providers(cfg, legacy=CONFIG_PATH.exists())
     out["board"] = configured_board(cfg, legacy=CONFIG_PATH.exists())
     out["port"] = serial_port(out["port"])
+    validate_options(out)
     if not isinstance(out["interval_s"], int) or isinstance(out["interval_s"], bool):
         raise ValueError("interval_s must be an integer")
     if not 15 <= out["interval_s"] <= 240:
@@ -541,6 +545,8 @@ class Panel:
         if self.boot_id is None and self.last_uptime is not None and uptime is not None and uptime < self.last_uptime:
             raise ConnectionResetError("Panel uptime reset; restoring views")
         self.boot_id, self.last_uptime = boot_id, uptime
+        status = getattr(self, 'health', None)
+        if isinstance(status, HostStatus): status.update('connected', self.name)
 
     def report_tokens(self):
         if self.tokens_supported and isinstance(self.token_reporter, TokenReporter):
@@ -751,7 +757,11 @@ def _run_loop(cfg, interval, zai_key, views):
     retries = ProviderRetries(interval)
     fetcher = FetchPool()
     watcher = ConfigWatcher()
+    health = HostStatus(HERE)
+    health.data['board'] = cfg.get('board', '')
+    health.update('starting')
     tokens = TokenReporter(providers=views, activity_dir=HERE / 'activity')
+    tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
         while True:
             watcher.check()
@@ -759,6 +769,7 @@ def _run_loop(cfg, interval, zai_key, views):
             if changed_config is not None:
                 previous = cfg
                 cfg = changed_config
+                health.data['board'] = cfg.get('board', '')
                 interval = cfg["interval_s"]
                 zai_key = cfg.get("zai_key", "")
                 changed_views = selected_providers(cfg)
@@ -768,6 +779,8 @@ def _run_loop(cfg, interval, zai_key, views):
                 if changed_views != views:
                     tokens = TokenReporter(providers=changed_views, activity_dir=HERE / 'activity')
                 retries.interval = interval
+                tokens.poll_seconds = cfg.get('token_poll_s', 2)
+                health.data['providers'] = {key: value for key, value in health.data['providers'].items() if key in changed_views}
                 if previous.get("zai_key") != zai_key:
                     retries.succeeded("zcode")
                 if cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views:
@@ -778,11 +791,15 @@ def _run_loop(cfg, interval, zai_key, views):
             if panel is None:
                 port_name = find_port(cfg["port"], cfg.get('board', 'guition-p4'))
                 if not port_name:
-                    LOG("No candidate serial port found; retrying in 30 s")
-                    time.sleep(30)
+                    health.update('waiting_usb', '')
+                    LOG('USB selection unresolved. Choose an explicit port if several devices are connected.')
+                    wait_for_config(watcher, cfg.get('reconnect_s', 5))
                     continue
                 try:
+                    health.update('connecting', port_name)
                     panel = connect_panel(port_name, views, cfg.get('board', 'guition-p4'))
+                    panel.health = health
+                    health.update('connected', port_name)
                     panel.retries = retries
                     panel.fetcher = fetcher
                     panel.config_watcher = watcher
@@ -791,7 +808,8 @@ def _run_loop(cfg, interval, zai_key, views):
                     LOG(f"connected to {port_name}, views={views}")
                 except Exception as exc:
                     LOG(f"open {port_name} failed: {exc}")
-                    time.sleep(5)
+                    health.update('reconnecting', port_name)
+                    wait_for_config(watcher, cfg.get('reconnect_s', 5))
                     continue
             try:
                 cycle_started = time.monotonic()
@@ -822,11 +840,22 @@ def _run_loop(cfg, interval, zai_key, views):
                 LOG(f"panel link failed: {exc}; reconnecting")
                 panel.close()
                 panel = None
-                time.sleep(5)
+                health.update('reconnecting')
+                wait_for_config(watcher, cfg.get('reconnect_s', 5))
     finally:
+        health.update('stopped')
         fetcher.close()
         if panel is not None:
             panel.close()
+
+
+def wait_for_config(watcher, seconds):
+    """Apply a saved USB change promptly even while the display is unplugged."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        watcher.check()
+        if watcher.pending is not None: return
 
 
 def poll_cycle(cfg, zai_key, views, frame_id, panel):
@@ -881,6 +910,9 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         payload["frameId"] = frame_id
         panel.send_frame(json.dumps(payload, allow_nan=False), frame_id)
         panel.wait_for("ack", seconds=2, frame_id=frame_id)
+        health = getattr(panel, 'health', None)
+        if isinstance(health, HostStatus):
+            health.provider(provider, 'activity_only' if informational else 'ready' if rows and not notice else 'unavailable')
         LOG(f"{provider}: frame {frame_id} ACK")
     return frame_id
 

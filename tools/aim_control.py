@@ -20,6 +20,7 @@ import base64
 from codex_support import setup_codex, codex_command
 from host_security import read_local_json, safe_text, serial_port, powershell_executable
 from board_profiles import BOARDS, get_board, configured_board
+from host_status import validate_options
 
 
 class SetupError(ValueError):
@@ -130,6 +131,10 @@ def configure(root=ROOT, ask=input, read_secret=getpass.getpass):
     config = local_config(root)
     config['board'] = choose_board(config.get('board', ''), ask)
     board = get_board(config['board'])
+    validate_options(config)
+    if type(config['interval_s']) is not int or not 15 <= config['interval_s'] <= 240:
+        raise SetupError('Quota refresh must be between 15 and 240 seconds. Save settings before starting.')
+    host.credential(os.environ.get('ZAI_API_KEY', config['zai_key']), optional=True)
     if board.experimental:
         print('S3: use the USB TO UART connector for flashing AND host data. Native USB is not this transport.')
         print('Brightness is visual dimming; the physical backlight supports on/off. RGB/touch need hardware verification.')
@@ -227,7 +232,7 @@ def start_host(root=ROOT):
     time.sleep(1)
     if process.poll() is not None:
         raise SetupError("Host exited during startup. Use Status and View log.")
-    print("Host started in the background. You may close this window.")
+    print("Host process started in the background. Check USB and provider status in the app; a running process does not confirm a connection.")
 
 
 def firmware_file(kind, root=ROOT, board_id='guition-p4'):

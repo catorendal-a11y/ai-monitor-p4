@@ -25,6 +25,7 @@ class TokenReporter:
         self.previous = {}
         self.last_use = None
         self.last_poll = None
+        self.poll_seconds = 2
 
     @staticmethod
     def read_counts(provider, path):
@@ -44,7 +45,7 @@ class TokenReporter:
         now = self.clock()
         if self.started is None:
             self.started = now
-        if self.last_poll is not None and now - self.last_poll < 2:
+        if self.last_poll is not None and now - self.last_poll < self.poll_seconds:
             return None
         self.last_poll = now
         delta, sources = 0, 0

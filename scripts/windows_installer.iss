@@ -38,7 +38,7 @@ Uninstallable=yes
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "tools\aim_host.json,tools\aim_host.log,tools\activity\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "tools\aim_host.json,tools\aim_host.status.json,tools\aim_host.log,tools\activity\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{userprograms}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: "{app}"
