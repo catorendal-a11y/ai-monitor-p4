@@ -20,6 +20,24 @@ class RetainedBuffer(io.BytesIO):
 
 
 class CodexOnboardingTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'Windows executable resolution')
+    def test_posix_npm_shim_does_not_hide_native_windows_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/'codex').write_text('#!/bin/sh\nexit 1\n')
+            native=root/'native'; native.mkdir(); (native/'codex.exe').touch()
+            with patch.dict(os.environ, {'PATH': str(root), 'CODEX_INSTALL_DIR': str(native)}):
+                self.assertEqual(support.codex_command(), [str(native/'codex.exe')])
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows npm wrapper resolution')
+    def test_extensionless_npm_shim_does_not_hide_working_cmd_wrapper(self):
+        from host_security import path_executable
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); (root/'codex').write_text('#!/bin/sh\nexit 1\n')
+            shim=root/'codex.cmd'; shim.touch()
+            with patch.dict(os.environ, {'PATH': str(root)}):
+                self.assertEqual(path_executable('codex'), str(shim))
+
     def test_existing_logged_in_client_is_reused_without_install_or_login(self):
         with patch.object(support,'codex_command',return_value=['official-cli']), \
                 patch.object(support.subprocess,'run',return_value=Mock(returncode=0)) as run, \

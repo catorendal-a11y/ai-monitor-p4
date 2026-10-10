@@ -39,7 +39,12 @@ def allowed_executable(path):
 
 def path_executable(name):
     # Do not use the Windows implicit current-directory executable search.
-    suffixes = ('', '.exe', '.cmd', '.bat') if os.name == 'nt' else ('',)
+    if os.name == 'nt':
+        # npm also installs an extensionless POSIX shell shim. Windows cannot
+        # execute it; selecting it hides a usable .cmd/native installation.
+        suffixes = ('',) if Path(name).suffix.lower() in ('.exe', '.cmd', '.bat') else ('.exe', '.cmd', '.bat')
+    else:
+        suffixes = ('',)
     for item in os.environ.get('PATH', '').split(os.pathsep):
         directory = Path(item)
         if not item or not directory.is_absolute(): continue

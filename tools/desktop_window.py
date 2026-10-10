@@ -26,7 +26,7 @@ from host_security import safe_text
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 from host_status import read_status
 
-APP_VERSION = 'v1.17.1'
+APP_VERSION = 'v1.17.2'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''

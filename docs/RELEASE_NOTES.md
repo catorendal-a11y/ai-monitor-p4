@@ -1,4 +1,6 @@
-# AI Monitor v1.17.1
+# AI Monitor v1.17.2
+
+Windows command discovery now ignores npm's extensionless POSIX shell launcher and selects a Windows `.exe` or supported `.cmd`/`.bat` wrapper instead. This fixes Codex quota reads from an Explorer-launched app when the development terminal had a different PATH. Existing Codex sign-in is reused; no new account or key is imported.
 
 A full uninstall, flash erase and GUI first-installation test found a P4 bootloader defect that application-only updates did not expose: the factory image declared 4 MB flash while its board and partition table require 16 MB. The write/hash check succeeded, but the board then boot-looped. The build now explicitly sets the image header to 16 MB.
 
