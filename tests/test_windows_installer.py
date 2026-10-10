@@ -14,7 +14,7 @@ class InstallerTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(); self.addCleanup(self.directory.cleanup)
         self.package = Path(self.directory.name)
-        files = {'src/config.h': '#define FW_VERSION "v1.15.1"',
+        files = {'src/config.h': '#define FW_VERSION "v1.16.0"',
                  'AI-Monitor.exe': 'gui', 'AI-Monitor-Console.exe': 'host',
                  'firmware-flasher.exe': 'flasher', '_internal/PySide6/Qt6Core.dll': 'runtime'}
         for name, text in files.items():
@@ -27,7 +27,7 @@ class InstallerTests(unittest.TestCase):
             path.relative_to(self.package).as_posix() for path in files))
 
     def test_complete_verified_package_is_accepted(self):
-        self.assertEqual(builder.verify_package(self.package), '1.15.1')
+        self.assertEqual(builder.verify_package(self.package), '1.16.0')
 
     def test_modified_missing_and_unreviewed_files_are_rejected(self):
         (self.package/'AI-Monitor.exe').write_text('changed')

@@ -9,8 +9,8 @@ const picture = name => 'data:image/png;base64,' + fs.readFileSync(path.join(roo
 const orbit = picture('docs/ui/orbit-ocean.png');
 const nova = picture('docs/nova-preview.png');
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="640" viewBox="0 0 1280 640">
-<title>AI Monitor P4 — ESP32-P4 AI desk companion</title>
-<desc>NOVA and ORBIT actual UI previews with synthetic data. Local token activity, provider quota, USB touchscreen and a portable Windows app.</desc>
+<title>AI Monitor — ESP32-P4 and experimental ESP32-S3 desk companion</title>
+<desc>NOVA and ORBIT actual UI previews with synthetic data. Local token activity, readable provider quotas, USB touchscreen and a Windows installer.</desc>
 <defs>
  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#08251d"/><stop offset="1" stop-color="#071420"/></linearGradient>
  <radialGradient id="glow"><stop stop-color="#0e8591" stop-opacity=".23"/><stop offset="1" stop-color="#0e8591" stop-opacity="0"/></radialGradient>
@@ -24,8 +24,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 <ellipse cx="1030" cy="300" rx="510" ry="450" fill="url(#glow)"/>
 <g font-family="Segoe UI,Arial,sans-serif">
  <rect x="64" y="72" width="6" height="20" rx="3" fill="#96f7ba"/>
- <text x="84" y="89" font-size="15" font-weight="700" letter-spacing="2" fill="#9af3bb">OPEN SOURCE · ESP32-P4 · LVGL</text>
- <text x="64" y="167" font-size="54" font-weight="800" letter-spacing="-1" fill="#f1fff7">AI MONITOR P4</text>
+ <text x="84" y="89" font-size="15" font-weight="700" letter-spacing="2" fill="#9af3bb">OPEN SOURCE · ESP32 · LVGL</text>
+ <text x="64" y="167" font-size="54" font-weight="800" letter-spacing="-1" fill="#f1fff7">AI MONITOR</text>
  <text x="64" y="235" font-size="34" font-weight="600" fill="#d4eee5">A desk companion</text>
  <text x="64" y="279" font-size="34" font-weight="600" fill="#d4eee5">for your AI tools.</text>
  <g fill="#0c3129" stroke="#2a564c">
@@ -38,7 +38,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
  </g>
  <text x="64" y="453" font-size="20" fill="#f1fff7">Local token activity. Usage at a glance.</text>
  <text x="64" y="486" font-size="18" fill="#90b7aa">Connect by USB. Choose your providers.</text>
- <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">2 robots · 4 themes · Windows app</text>
+ <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">2 robots · 4 themes · Windows installer</text>
  <text x="64" y="603" font-size="14" fill="#87a89e">github.com/catorendal-a11y/ai-monitor-p4-s3</text>
 </g>
 <rect x="628" y="125" width="594" height="366" rx="21" fill="#03111b" stroke="#386272" stroke-width="2" filter="url(#shadow)"/>

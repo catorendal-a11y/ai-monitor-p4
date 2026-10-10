@@ -150,6 +150,40 @@ static void settle_backlight() {
   idle_dim_update(); fakeTick += 600; idle_dim_update();
 }
 
+static void check_readable_text(lv_obj_t* object) {
+  lv_point_t size{};
+  lv_text_get_size(&size, lv_label_get_text(object), lv_obj_get_style_text_font(object, LV_PART_MAIN),
+                  0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  CHECK(size.x <= lv_obj_get_content_width(object));
+  CHECK(size.y <= lv_obj_get_height(object));
+}
+
+static void test_nova_readability(const std::filesystem::path& screenshots) {
+  set_sample(8, 3); nova_ui::page = 0;
+  std::strcpy(sample.views[7].providerKey, "opencode"); std::strcpy(sample.viewKeys[7], "opencode");
+  for (size_t v = 0; v < 8; ++v)
+    for (auto& row : sample.views[v].rows) row.usedPercent = v % 2 ? 100 : 0.01f;
+  ui_nova_show();
+  for (size_t p = 0; p < 4; ++p) {
+    nova_ui::page = static_cast<uint8_t>(p); ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+    for (const auto& item : nova_ui::providers) {
+      for (auto* object : {item.name, item.percent, item.status}) {
+        check_inside(item.card, object); check_readable_text(object);
+      }
+      lv_area_t name{}, percent{}, bar{};
+      lv_obj_get_coords(item.name, &name); lv_obj_get_coords(item.percent, &percent); lv_obj_get_coords(item.bar, &bar);
+      CHECK(name.x2 < percent.x1 && percent.y2 < bar.y1);
+    }
+  }
+  sample.views[6].informational = true; sample.views[6].hasUsage = false;
+  ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+  check_readable_text(nova_ui::providers[0].percent); check_readable_text(nova_ui::providers[0].status);
+  lv_area_t guidance{}, action{}; lv_obj_get_coords(nova_ui::pageLabel, &guidance);
+  lv_obj_get_coords(nova_ui::updateButton, &action); CHECK(guidance.y2 < action.y1);
+  screenshot(screenshots, "nova-readable-external-providers");
+  nova_ui::page = 0; set_sample(2, 2); ui_nova_update();
+}
+
 static void test_quota_windows(const std::filesystem::path& screenshots) {
   testNovaWindows.clear(); testWarningRules.clear(); warningPercent = 25;
   testAppearance = app_settings::Appearance{}; ui_theme::apply(testAppearance.theme);
@@ -829,6 +863,7 @@ int main(int argc, char** argv) {
   CHECK(lv_obj_get_parent(dimmer) == lv_layer_sys());
   lv_obj_delete(dimmer);
   test_quota_windows(screenshots);
+  test_nova_readability(screenshots);
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

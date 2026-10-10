@@ -1,6 +1,6 @@
 # Windows installation and app trust
 
-Download **AI-Monitor-Setup-v1.15.1-windows.exe** from this repository's Releases. It installs the complete Windows x64 app, runtime, flasher, firmware, notices and corresponding third-party source into your own user profile. Python, PlatformIO and administrator rights are unnecessary. It opens the graphical setup after installation; choose your board/providers and follow their instructions. Firmware writing still requires reviewing the target and typing FLASH.
+Download **AI-Monitor-Setup-v1.16.0-windows.exe** from this repository's Releases. It installs the complete Windows x64 app, runtime, flasher, firmware, notices and corresponding third-party source into your own user profile. Python, PlatformIO and administrator rights are unnecessary. It opens the graphical setup after installation; choose your board/providers and follow their instructions. Firmware writing still requires reviewing the target and typing FLASH.
 
 The portable ZIP remains available. Keep the complete folder together, including `_internal`. `firmware-flasher.exe` is a command-line helper; double-clicking it explains how to open the graphical Firmware tab. Normal installation shows progress and errors in the app instead of disappearing.
 

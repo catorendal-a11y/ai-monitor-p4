@@ -2,10 +2,52 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
-![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
+<p align="center">
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/ai-monitor-p4-s3/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;logo=github&amp;color=54c4f2"></a>
+</p>
+<p align="center">
+  <a href="docs/BOARDS.md"><img alt="ESP32-P4 supported" src="https://img.shields.io/badge/ESP32--P4-supported-35d07f?style=flat-square"></a>
+  <a href="docs/BOARDS.md"><img alt="Original Waveshare S3 experimental" src="https://img.shields.io/badge/Waveshare%20S3-experimental-ffb96a?style=flat-square"></a>
+  <a href="docs/BOARDS.md"><img alt="800 by 480 touch interface" src="https://img.shields.io/badge/display-800%20%C3%97%20480%20touch-54c4f2?style=flat-square"></a>
+  <a href="platformio.ini"><img alt="LVGL 9.6.0" src="https://img.shields.io/badge/LVGL-9.6.0-c49aff?style=flat-square"></a>
+  <a href="docs/DEVELOPMENT.md"><img alt="Arduino and PlatformIO firmware" src="https://img.shields.io/badge/firmware-Arduino%20%2B%20PlatformIO-00979d?style=flat-square"></a>
+</p>
+<p align="center">
+  <a href="docs/CODEX_SETUP.md"><img alt="Codex local tokens and quota" src="https://img.shields.io/badge/Codex-local%20%2B%20quota-10a37f?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#zcode"><img alt="ZCode local tokens and optional quota key" src="https://img.shields.io/badge/ZCode-local%20%2B%20quota-14b8a6?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#claude-code"><img alt="Claude Code local tokens and optional quota bridge" src="https://img.shields.io/badge/Claude%20Code-local%20%2B%20bridge-d97757?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#gemini-cli"><img alt="Gemini CLI local activity" src="https://img.shields.io/badge/Gemini%20CLI-local%20activity-4285f4?style=flat-square"></a>
+  <br>
+  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Copilot requires numeric bridge" src="https://img.shields.io/badge/Copilot-bridge%20required-a371f7?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Cursor requires numeric bridge" src="https://img.shields.io/badge/Cursor-bridge%20required-b9b9c7?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Antigravity requires numeric bridge" src="https://img.shields.io/badge/Antigravity-bridge%20required-4e8cff?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode requires numeric bridge" src="https://img.shields.io/badge/OpenCode-bridge%20required-8b9ba8?style=flat-square"></a>
+</p>
+<p align="center">
+  <a href="#make-it-yours"><img alt="NOVA and ORBIT companions" src="https://img.shields.io/badge/companions-NOVA%20%2B%20ORBIT-35d07f?style=flat-square"></a>
+  <a href="#make-it-yours"><img alt="Four saved color themes" src="https://img.shields.io/badge/themes-4%20saved%20palettes-c49aff?style=flat-square"></a>
+  <a href="docs/QUICK_START.md#everyday-use"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
+  <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest"><img alt="Windows x64 installer" src="https://img.shields.io/badge/Windows%20x64-single%20installer-54c4f2?style=flat-square"></a>
+  <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
+  <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
+  <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
+</p>
+<p align="center">
+  <a href="docs/GITHUB_SECURITY.md"><img alt="USB-only display connection" src="https://img.shields.io/badge/display%20connection-USB%20only-6f8996?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#privacy-and-limits"><img alt="No model prompts generated by the monitor" src="https://img.shields.io/badge/model%20prompts-none-35d07f?style=flat-square"></a>
+  <a href="docs/GITHUB_SECURITY.md"><img alt="Cloud credentials stay on the PC" src="https://img.shields.io/badge/cloud%20keys-PC%20only-35d07f?style=flat-square"></a>
+</p>
 
-[![Build and test](https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+*Quota needs the provider's supported account/key/bridge. Gemini and external numeric bridges report activity only. S3 remains experimental. Windows binaries are currently unsigned.*
+
+![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
 **[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
@@ -20,6 +62,8 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 | ![NOVA showing AI activity and usage](docs/nova-preview.png) | ![ORBIT on the Ocean companion screen](docs/ui/orbit-ocean.png) |
 
 These previews are rendered from the actual LVGL interface using synthetic data. They are UI renders, not photographs of the display.
+
+The companion panel uses less horizontal space while preserving the robot's size. Usage percentages, provider names and status text have larger fonts so they are easier to read on the 4.3-inch display.
 
 ## What you need
 
@@ -50,7 +94,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.15.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.15.1-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.16.0-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.16.0-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -58,7 +102,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.15.1/AI-Monitor-Setup-v1.15.1-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.15.1/ai-monitor-p4-v1.15.1-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.15.1/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.0/AI-Monitor-Setup-v1.16.0-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.0/ai-monitor-p4-v1.16.0-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.16.0/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 
