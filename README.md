@@ -4,10 +4,10 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
 
 ![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
-[![Build and test](https://github.com/catorendal-a11y/ai-monitor-p4/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/catorendal-a11y/ai-monitor-p4/actions/workflows/ci.yml)
+[![Build and test](https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/q-a)
+**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
@@ -48,7 +48,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 ## Get running on Windows
 
-1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases/latest) and download **ai-monitor-p4-v1.14.0-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
+1. **Download and extract.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and download **ai-monitor-p4-v1.14.0-windows.zip**. Extract the entire ZIP into a writable folder; keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -56,7 +56,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity; flashing is optional for P4. A new S3 board requires its own first installation.
 
-**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.14.0/ai-monitor-p4-v1.14.0-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4/releases/download/v1.14.0/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
+**[Direct Windows ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.14.0/ai-monitor-p4-v1.14.0-windows.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.14.0/SHA256SUMS.txt) · [Full setup and troubleshooting](docs/QUICK_START.md)
 
 GitHub's **Source code (zip)** download contains source only; it does not include the portable programs or prebuilt firmware.
 
@@ -133,7 +133,7 @@ No maintainer credentials are included in the source or release. Your optional Z
 
 ## Run from source or contribute
 
-Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/ai-monitor-p4/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/ai-monitor-p4/issues/new/choose). Keep keys, account data and private logs out of posts.
+Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/ai-monitor-p4-s3/issues/new/choose). Keep keys, account data and private logs out of posts.
 
 If the project helps your setup, a GitHub star makes it easier to find again. Follow the repository's releases to hear about updates.
 
@@ -146,6 +146,6 @@ sh setup.sh
 
 Firmware builds, serial permissions and test dependencies are covered in the [developer guide](docs/DEVELOPMENT.md). The [release guide](docs/RELEASING.md) explains the separate build/publish jobs and reviewed draft releases. Ordinary source pushes do not publish a release.
 
-[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/ai-monitor-p4/releases)
+[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases)
 
 Project-owned code and original NOVA/ORBIT artwork use [MIT](LICENSE). Drivers, dependencies, fonts and provider marks retain their own terms: [third-party notices](THIRD_PARTY_NOTICES.md), [NOVA/logo sources](assets/nova/SOURCES.md) and [ORBIT artwork](assets/orbit/SOURCES.md). This is an independent project and is not endorsed by its AI providers.

@@ -395,8 +395,8 @@ class MonitorWindow(QMainWindow):
                                'Token activity starts with a baseline and can lag generation. '
                                'The monitor does not send prompts to AI models. '
                                'Your optional API key stays in local tools/aim_host.json; keep it private.', 'muted', True))
-        layout.addWidget(self._button('Open setup guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4/blob/main/docs/QUICK_START.md'))))
-        layout.addWidget(self._button('Open provider guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4/blob/main/docs/PROVIDERS.md'))))
+        layout.addWidget(self._button('Open setup guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/QUICK_START.md'))))
+        layout.addWidget(self._button('Open provider guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md'))))
         layout.addStretch()
         return widget
 
