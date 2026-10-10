@@ -11,7 +11,7 @@ def main():
         os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
         from PySide6.QtWidgets import QApplication
         from desktop_window import MonitorWindow
-        application = QApplication(sys.argv[:1])
+        application = QApplication.instance() or QApplication(sys.argv[:1])
         with tempfile.TemporaryDirectory(prefix='ai-monitor-gui-check-') as directory:
             window = MonitorWindow(Path(directory), monitor=False)
             valid = not window.nova.pixmap().isNull() and not window.windowIcon().isNull()

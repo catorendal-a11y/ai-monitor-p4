@@ -130,6 +130,19 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertTrue(self.window.host_log.isReadOnly())
         self.assertFalse((self.root/'tools/aim_host.json').exists())
 
+    def test_missing_packaged_firmware_fails_diagnostics_without_a_crash_dialog(self):
+        import aim_desktop
+        with patch.object(aim_desktop.sys, 'frozen', True, create=True), \
+                patch.object(aim_desktop.sys, 'argv', ['AI-Monitor.exe', '--gui-check']), \
+                patch.object(control, 'ROOT', self.root), patch.object(QMessageBox, 'critical') as dialog:
+            self.assertEqual(aim_desktop.main(), 1)
+        dialog.assert_not_called()
+
+    def test_flashing_diagnostics_reject_missing_package_without_launching_child(self):
+        with patch.object(desktop.subprocess, 'run') as child:
+            self.assertFalse(desktop.check_flasher_runtime(self.root))
+        child.assert_not_called()
+
     def test_s3_selection_and_save_use_real_widgets(self):
         self.window.board.setCurrentIndex(self.window.board.findData('waveshare-s3-43'))
         self.window.providers['gemini'].setChecked(True)

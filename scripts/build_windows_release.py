@@ -76,9 +76,6 @@ def main():
             str(ROOT / 'scripts/esptool_entry.py'))
     if (package / '_internal/icuuc.dll').exists():
         raise RuntimeError('Unexpected bundled ICU: use a clean builder PATH; Qt requires the Windows system ICU')
-    # A windowed executable can start and still fail to import Qt. This exact
-    # packaged application must complete its synthetic GUI check before export.
-    subprocess.run([str(package / 'AI-Monitor.exe'), '--gui-check'], cwd=package, check=True, timeout=30)
     files = subprocess.check_output(['git', '-C', str(ROOT), 'ls-files'], text=True).splitlines()
     # Export reviewed source; never recursively copy runtime/private directories.
     for name in files:
@@ -114,6 +111,9 @@ def main():
     for board in BOARDS.values():
         firmware_file('install', package, board.id)
         firmware_file('update', package, board.id)
+    # Test the exact app only after source, both images and their manifest are
+    # present: its diagnostics also launch the actual packaged flasher child.
+    subprocess.run([str(package / 'AI-Monitor.exe'), '--gui-check'], cwd=package, check=True, timeout=30)
     licenses = package / 'licenses'
     licenses.mkdir()
     for distribution in metadata.distributions():

@@ -128,11 +128,14 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
 def check_flasher_runtime(root: Path) -> bool:
     """Read image metadata using the exact child EXE, without opening USB."""
     environment = dict(os.environ); environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
-    for board in control.BOARDS.values():
-        image = control.firmware_file('update', root, board.id)
-        result = subprocess.run([str(root/'firmware-flasher.exe'), '--chip', board.chip, 'image-info', str(image)],
-            cwd=root, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            timeout=30, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-        if result.returncode:
-            return False
+    try:
+        for board in control.BOARDS.values():
+            image = control.firmware_file('update', root, board.id)
+            result = subprocess.run([str(root/'firmware-flasher.exe'), '--chip', board.chip, 'image-info', str(image)],
+                cwd=root, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                timeout=30, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            if result.returncode:
+                return False
+    except (control.SetupError, OSError, subprocess.TimeoutExpired):
+        return False
     return True
