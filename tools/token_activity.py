@@ -17,6 +17,8 @@ class TokenReporter:
         self.paths = {"codex": home / ".codex/state_5.sqlite", "zcode": home / ".zcode/cli/db/db.sqlite"}
         if default_home: self.paths['codex'] = codex_home() / 'state_5.sqlite'
         self.paths.update(claude=home / '.claude/projects', gemini=home / '.gemini/tmp')
+        from opencode_activity import database_path
+        self.paths['opencode'] = database_path(home)
         self.providers = ['codex', 'zcode'] if providers is None else list(providers)
         self.activity_dir = Path(activity_dir) if activity_dir is not None else None
         self.local = LocalActivity()
@@ -55,6 +57,9 @@ class TokenReporter:
                 counts = self.read_counts(provider, self.paths[provider])
             elif provider in ('claude', 'gemini'):
                 counts = self.local.read(provider, self.paths[provider])
+            elif provider == 'opencode':
+                from opencode_activity import read_counts
+                counts = read_counts(self.paths[provider])
             else:
                 counts = None
             if self.activity_dir is not None:
@@ -69,7 +74,8 @@ class TokenReporter:
             if previous is not None:
                 for key, value in counts.items():
                     # Codex forks/imports can contain history on first sight. Baseline new thread IDs.
-                    old = previous.get(key, value if provider == "codex" else 0)
+                    baseline_new = provider == 'codex' or (provider == 'opencode' and key.startswith('session:'))
+                    old = previous.get(key, value if baseline_new else 0)
                     delta += max(0, value - old)
             history = previous if previous is not None else OrderedDict()
             for key, value in counts.items():

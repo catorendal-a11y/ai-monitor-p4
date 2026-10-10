@@ -321,6 +321,12 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   CHECK(std::string(lv_label_get_text(quotaProviderHelp)).find("Local token activity only") == 0);
   CHECK(std::string(lv_label_get_text(quotaSelectionLabel)).find("No quota windows reported") == 0);
   screenshot(screenshots, "settings-quota-local-only");
+  std::strcpy(sample.views[0].providerKey, "opencode"); std::strcpy(sample.viewKeys[0], "opencode");
+  refresh_quota(nullptr);
+  CHECK(quotaChoiceCount == 0);
+  CHECK(std::string(lv_label_get_text(quotaSetupHelp)).find("local tokens are read automatically") != std::string::npos);
+  for (auto* label : {quotaProviderHelp, quotaSetupHelp}) check_readable_text(label);
+  screenshot(screenshots, "settings-opencode-local");
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "LOCAL");
   sample = aim::Snapshot{}; ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);

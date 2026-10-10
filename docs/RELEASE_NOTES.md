@@ -5,13 +5,17 @@ The Windows host now separates background-process status, verified USB connectio
 - New **Host settings**: USB retry interval, local token read interval, terminal text size, opt-in start when opening the app, and keep/stop host when closing it. No Windows service or startup task is installed.
 - **Check connection** reads the display identity without writing firmware or requesting AI quota. A busy host is left alone; wrong hardware and missing firmware get actionable instructions.
 - Codex discovers its official per-user native installation even when an Explorer-launched app has an older PATH. Account quota uses read-only CLI RPC, with no model turn.
+- **Check AI setup** checks each selected local token source from the app. Unsupported automatic editor integrations are explicitly labeled; no account quota is fabricated.
+- A dedicated **AI setup** tab keeps provider choices, instructions and key entry separate from the display connection controls. **Provider setup** opens that tab; Codex has its own official install/sign-in action.
+- Claude's optional subscription quota link can be installed and removed in Setup. Installation is idempotent, keeps a private backup, and preserves custom statuslines. The frozen GUI always targets the console helper.
+- OpenCode has a built-in read-only numeric SQLite adapter for documented V1 message and V2 session usage. No integration script is needed for these schemas. NOVA/ORBIT Settings explains its activity-only support.
 - USB selection shows device descriptions. Rescanning preserves the explicit port and no longer marks unchanged settings as unsaved.
 - Saved USB changes interrupt disconnected retry waits promptly. Local token polling stays independent of quota refresh; provider backoff survives USB reconnects.
 - Corrupt local configuration opens the app's recovery screen. Explicit recovery backs up the original private bytes locally before resetting; valid configurations cannot be reset this way.
 - Unsaved changes are checked before closing. Firmware errors retain their specific instructions instead of a generic failure.
 - Local health snapshots use fresh process IDs and bounded atomic files. Keys, prompts, account replies and telemetry databases are excluded from release exports.
 
-The default remains: no board/provider preselection, no automatic host start, and the host keeps running after closing the app. Installer upgrades preserve private settings. Firmware functionality is unchanged from v1.16.1; the new Windows host also works with existing v1.16.1 displays, so a firmware update is optional.
+The default remains: no board/provider preselection, no automatic host start, and the host keeps running after closing the app. Installer upgrades preserve private settings. The new Windows host also works with existing v1.16.1 displays; the firmware update adds revised provider guidance in Settings.
 
 **Windows trust:** binaries remain unsigned. No Windows security controls are disabled. Trusted signing/reputation requires a real publisher certificate and cannot be replaced by version metadata.
 

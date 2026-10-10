@@ -8,14 +8,14 @@ First-time setup has **no preselected AI**. Check one or more providers explicit
 | --- | --- | --- | --- |
 | Codex | Numeric counters in the default local Codex SQLite database | Official CLI account interface, with legacy file fallback | Choose Codex; setup offers official installation/sign-in as needed. See CODEX_SETUP.md. |
 | ZCode | Numeric request counters in the local ZCode SQLite database | Existing Z.AI coding-plan adapter | Choose ZCode. Its optional coding-plan key is requested only for this selection. |
-| Claude Code | Assistant usage fields from local CLI JSONL transcripts; repeated message IDs are deduplicated | Documented statusline rate-limit fields when supplied | Choose Claude. Local CLI logging is used automatically. Menu 7 offers the optional quota bridge. |
+| Claude Code | Assistant usage fields from local CLI JSONL transcripts; repeated message IDs are deduplicated | Documented statusline rate-limit fields when supplied | Choose Claude. Local CLI logging is used automatically. Setup offers Link Claude quota and safe removal. |
 | Gemini CLI | Reported token totals from recorded CLI JSON/JSONL sessions | No automatic account-quota adapter | Choose Gemini CLI and use it normally with session recording. |
 | GitHub Copilot | Numeric telemetry bridge | No automatic account-quota adapter in this release | Connect usage events from your Copilot SDK application; editor usage is not automatically imported. |
 | Cursor | Numeric telemetry bridge | No automatic personal-quota adapter | Supply cumulative token telemetry from an integration you control. Team Admin API access is a separate capability. |
 | Antigravity | Numeric telemetry bridge | No automatic quota adapter | Supply numeric telemetry. The CLI's interactive quota panel is not treated as a stable machine API. |
-| OpenCode | Numeric telemetry bridge | No automatic quota adapter | Export cumulative token usage from an SDK integration you control. |
+| OpenCode | Numeric SQLite message/session projections | No automatic quota adapter | Select OpenCode and use its client. No monitor key or script is needed for supported local schemas. |
 
-The graphical app exposes these limitations in each provider's tooltip; the console menu also lists them. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
+**Check AI setup** checks selected local sources and prints next steps in the Activity panel without model requests or USB writes. The graphical app exposes these limitations in each provider's tooltip; the console menu also lists them. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
 
 ## ZCode
 
@@ -29,9 +29,9 @@ Primary references: [ZCode quota and tool usage](https://zcode.z.ai/en/docs/usag
 
 Local activity uses assistant `message.usage` numeric fields from recent default CLI transcripts under `~/.claude/projects/`. Records with the same `message.id` are not counted twice; increases in a streamed record may still be registered later. Inputs, outputs and reported cache tokens are observed counts, not an invoice. CLI versions may omit or incompletely report output usage. Desktop/web sessions have separate storage and are not automatically covered.
 
-For quota display, click **Provider setup** (or choose **7** in AI-Monitor-Console.exe), then type **INSTALL** for the optional statusline bridge. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
+For quota display, select Claude Code in AI setup, save, then click **Link Claude quota** below its instructions. The console **Provider setup** also offers this optional integration. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
 
-If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `AI-Monitor-Console.exe --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an installed bridge, restore the backed-up Claude settings or remove only the inserted statusLine entry.
+If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `AI-Monitor-Console.exe --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. **Remove Claude quota link** removes only the command owned by this installation and preserves other settings. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it.
 
 Primary references: [Claude statusline fields](https://code.claude.com/docs/en/statusline), [CLI session storage](https://code.claude.com/docs/en/sessions), [usage monitoring](https://code.claude.com/docs/en/monitoring-usage). The numeric transcript adapter uses a version-sensitive local format; unsupported records remain unavailable.
 
@@ -40,6 +40,14 @@ Primary references: [Claude statusline fields](https://code.claude.com/docs/en/s
 Recorded sessions live at `~/.gemini/tmp/<project>/chats/session-*`. The adapter supports JSON session files and current JSONL records, retaining only model-message IDs and `tokens.total`. It does not read the local login/token cache. It does not equate context size with the account's remaining quota.
 
 Primary references: [recorded sessions](https://geminicli.com/docs/cli/session-management/), [official token-record types](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/chatRecordingTypes.ts), [official telemetry](https://geminicli.com/docs/cli/telemetry/).
+
+## OpenCode
+
+Select OpenCode, save, and use its official local client normally. The reader opens the documented default `~/.local/share/opencode/opencode.db` with SQLite read-only mode. `XDG_DATA_HOME` and a file-valued `OPENCODE_DB` are honored. Custom release-channel paths can be supplied through `OPENCODE_DB`; an in-memory database cannot be monitored.
+
+Supported schemas are V1 `message` assistant-token projections and V2 `session_v2` cumulative numeric usage. Only IDs and input/output/reasoning/cache counts are queried; message text and authentication tables are not loaded. IDs are hashed in memory. Queries are bounded and time-limited, and unsupported schemas remain unavailable. V2 imported/new session history is baselined to avoid treating imports as fresh work; subsequent increases animate the companion. Account quota is not inferred from tokens or costs. The existing numeric bridge remains optional for custom integrations.
+
+Primary references: [official database location](https://docs.opencode.ai/docs/cli/), [V1 assistant token schema](https://github.com/anomalyco/opencode/blob/dev/packages/schema/src/v1/session.ts), [V2 numeric projection schema](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/sql.ts), [normalized token semantics](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/usage.ts).
 
 ## External numeric bridge
 

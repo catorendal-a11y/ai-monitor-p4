@@ -5,10 +5,10 @@ This is a PC-app onboarding feature for people who choose Codex. It is not an au
 ## First installation
 
 1. Extract the full Windows release and open **AI-Monitor.exe**.
-2. In **Setup**, explicitly select your board, Codex (alone or with other tools) and the USB port. Click **Save settings** and accept the offer to open provider setup, or use the **Provider setup** button later.
+2. In **Setup**, explicitly select your board and USB port. In **AI setup**, select Codex alone or with other tools. Click **Save settings** and accept the offer to open provider setup, or use **AI setup > Install / sign in Codex** later.
 3. If the official Codex CLI is missing, setup offers the official OpenAI installer. Accept to install it, or decline to finish later. Existing CLI installations are reused.
 4. Setup checks sign-in quietly. If needed, it offers **official Codex sign-in**. Accept and finish the vendor's browser/terminal flow with your own ChatGPT account. The monitor never asks for or copies your OpenAI password/access token.
-5. Click **Start host**. Your choices remain selected if installation or login was skipped or failed. Use **Provider setup** to retry. AI-Monitor-Console.exe retains the original numbered menu for advanced use.
+5. Click **Start host**. Your choices remain selected if installation or login was skipped or failed. Use **AI setup > Install / sign in Codex** to retry. AI-Monitor-Console.exe retains the original numbered menu for advanced use.
 
 The installer and first sign-in need internet access. Windows uses OpenAI's standalone PowerShell installer; Linux/macOS source installations use its documented shell installer. No personal OpenAI key, GitHub key or credentials are shipped with the release.
 

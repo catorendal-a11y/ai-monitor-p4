@@ -190,16 +190,18 @@ static void refresh_quota_choices() {
   quota_text(quotaProviderLabel, style ? style->label : provider);
   const bool codex = strcmp(provider, "codex") == 0, zcode = strcmp(provider, "zcode") == 0;
   const bool claude = strcmp(provider, "claude") == 0, gemini = strcmp(provider, "gemini") == 0;
+  const bool opencode = strcmp(provider, "opencode") == 0;
   quota_text(quotaProviderHelp, codex ? "5 HOURS = short-term limit. 7 DAYS = weekly limit." :
       zcode ? "5 HOURS / 7 DAYS = model quota.\nMONTHLY MCP = tool calls, not a monthly token budget." :
       claude ? "5 HOURS / 7 DAYS come from the optional statusline bridge." :
-      gemini ? "Local token activity only. No account quota is available." :
+      (gemini || opencode) ? "Local token activity only. No account quota is available." :
       "Shows quota rows supplied by your numeric bridge.\nNo automatic editor account quota is available.");
   quota_text(quotaSetupHelp, !snapshot.hostPresent ? "Host offline. Open the PC app and Start host." :
       codex ? "For quota: sign in to Codex with ChatGPT in the PC app.\nTap a window; its percentage is shown on NOVA / ORBIT." :
       zcode ? "For quota: add your ZAI Coding Plan API key in the PC app.\nOnly windows returned by your plan have a percentage." :
-      claude ? "For quota: install the statusline bridge from Provider setup.\nAn API key alone does not provide subscription quota." :
+      claude ? "For quota: tap Link Claude quota in the PC app AI setup.\nAn API key alone does not provide subscription quota." :
       gemini ? "Use Gemini CLI with session recording for local activity.\nQuota options stay unavailable until real data is supplied." :
+      opencode ? "Use OpenCode on this PC; local tokens are read automatically.\nTap Check AI setup in the PC app to check the source." :
       "Set up the external numeric bridge in the PC app.\nLocal token counts are activity, not account quota.");
   lv_obj_set_state(quotaPrev, LV_STATE_DISABLED, quotaProviderCount < 2);
   lv_obj_set_state(quotaNext, LV_STATE_DISABLED, quotaProviderCount < 2);

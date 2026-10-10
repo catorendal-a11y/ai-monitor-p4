@@ -27,7 +27,7 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Copilot requires numeric bridge" src="https://img.shields.io/badge/Copilot-bridge%20required-a371f7?style=flat-square"></a>
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Cursor requires numeric bridge" src="https://img.shields.io/badge/Cursor-bridge%20required-b9b9c7?style=flat-square"></a>
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Antigravity requires numeric bridge" src="https://img.shields.io/badge/Antigravity-bridge%20required-4e8cff?style=flat-square"></a>
-  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode requires numeric bridge" src="https://img.shields.io/badge/OpenCode-bridge%20required-8b9ba8?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode automatic local token activity" src="https://img.shields.io/badge/OpenCode-local%20activity-8b9ba8?style=flat-square"></a>
 </p>
 <p align="center">
   <a href="#make-it-yours"><img alt="NOVA and ORBIT companions" src="https://img.shields.io/badge/companions-NOVA%20%2B%20ORBIT-35d07f?style=flat-square"></a>
@@ -47,7 +47,7 @@ A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CL
   <a href="docs/GITHUB_SECURITY.md"><img alt="Cloud credentials stay on the PC" src="https://img.shields.io/badge/cloud%20keys-PC%20only-35d07f?style=flat-square"></a>
 </p>
 
-*Quota needs the provider's supported account/key/bridge. Gemini and external numeric bridges report activity only. S3 remains experimental. Windows binaries are currently unsigned.*
+*Quota needs the provider's supported account/key/bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 remains experimental. Windows binaries are currently unsigned.*
 
 [![Support AI Monitor â€” give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
 
@@ -98,7 +98,9 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 *Actual desktop app rendered with synthetic saved settings. Fresh installations have no board or provider preselected.*
 
-[Preview the ZCode setup instructions and masked key field](docs/media/desktop-provider-guide.png).
+[Preview AI setup and provider choices](docs/media/desktop-ai-setup.png). ZCode's masked key field appears only when it is selected; leave it blank to preserve an existing key.
+
+**Check AI setup** checks selected local sources. Claude users can link and remove the optional subscription-quota integration directly in AI setup. OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage.
 
 **Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start when opening the app, and whether closing the app stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
 
@@ -131,7 +133,7 @@ Token activity and account quota are separate signals. A provider can animate th
 | **GitHub Copilot** | External numeric bridge | Activity only; editor usage is not imported automatically. |
 | **Cursor** | External numeric bridge | Activity only. |
 | **Antigravity** | External numeric bridge | Activity only. |
-| **OpenCode** | External numeric bridge | Activity only. |
+| **OpenCode** | Local SQLite usage | Automatic local activity; no remaining account quota. |
 
 **External bridge** means you must connect an integration that supplies cumulative token counts. Selecting that provider alone does not enable automatic tracking. See [provider requirements and bridge examples](docs/PROVIDERS.md).
 

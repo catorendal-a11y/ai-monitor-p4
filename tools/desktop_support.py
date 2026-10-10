@@ -131,21 +131,22 @@ def recent_log(root: Path, secrets: tuple[str, ...] = ()) -> str:
     return '\n'.join(safe_text(line) for line in text.splitlines()[-100:])
 
 
-def integration_command(root: Path) -> list[str]:
+def integration_command(root: Path, codex_only=False) -> list[str]:
+    option = '--setup-codex' if codex_only else '--integrations'
     if getattr(sys, 'frozen', False):
         helper = root / 'AI-Monitor-Console.exe'
         if not helper.is_file():
             raise control.SetupError('Console helper missing. Extract the complete Windows package.')
-        return [str(helper), '--integrations']
-    return [sys.executable, str(root / 'tools/aim_control.py'), '--integrations']
+        return [str(helper), option]
+    return [sys.executable, str(root / 'tools/aim_control.py'), option]
 
 
-def open_integrations(root: Path) -> None:
+def open_integrations(root: Path, codex_only=False) -> None:
     if os.name != 'nt':
         raise control.SetupError('Use tools/aim_control.py in a terminal for provider setup on this platform.')
     environment = dict(os.environ)
     environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
-    subprocess.Popen(integration_command(root), cwd=root, env=environment,
+    subprocess.Popen(integration_command(root, codex_only), cwd=root, env=environment,
                      creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0)
 
 

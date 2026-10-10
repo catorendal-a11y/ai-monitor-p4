@@ -185,6 +185,22 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertIn('COM4', self.window.usb_help.text())
         self.assertIn('explicitly', self.window.usb_help.text())
 
+    def test_claude_link_controls_require_saved_selection_and_confirmation(self):
+        self.assertTrue(self.window.claude_link_button.isHidden())
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['claude'].setChecked(True)
+        self.assertFalse(self.window.claude_link_button.isHidden())
+        self.window.save()
+        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No), \
+             patch.object(self.window, '_run') as run:
+            self.window.claude_quota(False)
+        run.assert_not_called()
+        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes), \
+             patch.object(self.window, '_run') as run, patch('provider_setup.claude_bridge', return_value='linked') as bridge:
+            self.window.claude_quota(False)
+            run.call_args.args[1](Mock())
+        bridge.assert_called_once_with(self.root, remove=False)
+
     def test_invalid_config_opens_recovery_ui_without_overwriting_file(self):
         self.window.close()
         (self.root/'tools').mkdir(exist_ok=True)
@@ -222,6 +238,7 @@ class DesktopWindowTests(unittest.TestCase):
         start.assert_not_called()
 
     def test_each_provider_has_visible_setup_instructions(self):
+        self.window.tabs.setCurrentIndex(1)
         from provider_catalog import PROVIDER_SETUP, PROVIDERS
         self.assertEqual(set(PROVIDER_SETUP), set(PROVIDERS))
         for key in PROVIDERS:

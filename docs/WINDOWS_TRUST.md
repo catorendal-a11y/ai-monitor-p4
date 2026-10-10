@@ -1,6 +1,6 @@
 # Windows installation and app trust
 
-Download **AI-Monitor-Setup-v1.16.1-windows.exe** from this repository's Releases. It installs the complete Windows x64 app, runtime, flasher, firmware, notices and corresponding third-party source into your own user profile. Python, PlatformIO and administrator rights are unnecessary. It opens the graphical setup after installation; choose your board/providers and follow their instructions. Firmware writing still requires reviewing the target and typing FLASH.
+Download **AI-Monitor-Setup-v1.17.0-windows.exe** from this repository's Releases. It installs the complete Windows x64 app, runtime, flasher, firmware, notices and corresponding third-party source into your own user profile. Python, PlatformIO and administrator rights are unnecessary. It opens the graphical setup after installation; choose your board/providers and follow their instructions. Firmware writing still requires reviewing the target and typing FLASH.
 
 The portable ZIP remains available. Keep the complete folder together, including `_internal`. `firmware-flasher.exe` is a command-line helper; double-clicking it explains how to open the graphical Firmware tab. Normal installation shows progress and errors in the app instead of disappearing.
 
@@ -11,6 +11,8 @@ The portable ZIP remains available. Keep the complete folder together, including
 Download only from the linked repository, compare SHA-256 with the release checksum, and retain Windows protection. Checksums detect corruption but do not independently authenticate a compromised release. If you do not trust the download or your organization blocks it, cancel and ask your administrator; do not weaken system policy.
 
 For future distribution, use a verified publisher with timestamped Authenticode signing, or submit an MSIX package through the Microsoft Store. Signing outside the Store can still require reputation to build; it cannot guarantee that every new binary is warning-free. Microsoft's current guidance: [SmartScreen reputation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation) and [code-signing options](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+
+Microsoft Security Intelligence can review a specific submitted file for incorrect detections. A submission is not a publisher certificate, Store certification, or a guarantee that SmartScreen reputation warnings disappear. Record the exact file SHA-256 and the final Microsoft determination; do not label a pending submission as approved.
 
 ## What is tested
 

@@ -243,7 +243,8 @@ class MonitorWindow(QMainWindow):
         self.token_state = label('Waiting for selected token sources.', 'muted', True)
         left.addWidget(self.token_state)
         left.addStretch(2)
-        left.addWidget(label('LOCAL RECORDS + USB\nClose this window and your\nhost keeps running.', 'muted', True))
+        self.close_hint = label('', 'muted', True)
+        left.addWidget(self.close_hint)
         left.addWidget(label(APP_VERSION, 'eyebrow'))
         layout.addWidget(sidebar)
 
@@ -274,6 +275,7 @@ class MonitorWindow(QMainWindow):
         right.addWidget(self.progress)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._setup_tab(), 'Setup')
+        self.tabs.addTab(self._ai_tab(), 'AI setup')
         self.tabs.addTab(self._preferences_tab(), 'Host settings')
         self.tabs.addTab(self._firmware_tab(), 'Firmware')
         self.tabs.addTab(self._help_tab(), 'Help')
@@ -317,7 +319,7 @@ class MonitorWindow(QMainWindow):
         form = QVBoxLayout(content)
         form.setContentsMargins(0, 15, 0, 0)
         form.setSpacing(10)
-        form.addWidget(label('Choose your board and providers below. Follow each provider\'s instructions, '
+        form.addWidget(label('Choose your display and USB connection here. Choose your AIs in AI setup, '
                              'save settings, then install display firmware if needed and start the host.', 'muted', True))
         form.addWidget(label('DISPLAY AND CONNECTION', 'eyebrow'))
         fields = QGridLayout()
@@ -352,6 +354,17 @@ class MonitorWindow(QMainWindow):
         form.addWidget(self.check_usb_button)
         self.board_help = label('', 'muted', True)
         form.addWidget(self.board_help)
+        form.addWidget(self._button('Choose and set up my AIs', lambda: self.tabs.setCurrentIndex(1), primary=True))
+        form.addStretch()
+        self.board.currentIndexChanged.connect(self._changed)
+        self.port.currentTextChanged.connect(self._changed)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(content)
+        return scroll
+
+    def _ai_tab(self):
+        content = QWidget(); form = QVBoxLayout(content)
+        form.setContentsMargins(8, 15, 8, 15); form.setSpacing(10)
+        form.addWidget(label('Choose the AIs you use, then save settings. Select an AI below to see its setup instructions.', 'muted', True))
         form.addWidget(label('CHOOSE YOUR AI PROVIDERS', 'eyebrow'))
         grid = QGridLayout()
         self.providers = {}
@@ -363,6 +376,10 @@ class MonitorWindow(QMainWindow):
             grid.addWidget(checkbox, index // 2, index % 2)
             self.providers[key] = checkbox
         form.addLayout(grid)
+        form.addWidget(label('Codex, ZCode, Claude Code, Gemini CLI and OpenCode have built-in local readers. '
+                             'Copilot, Cursor and Antigravity require an advanced numeric bridge; selecting them alone cannot import editor usage.', 'warning', True))
+        self.check_ai_button = self._button('Check AI setup', self.check_ai_setup)
+        form.addWidget(self.check_ai_button)
         form.addWidget(label('SETUP INSTRUCTIONS FOR EACH AI', 'eyebrow'))
         self.provider_guide = QComboBox()
         self.provider_guide.setAccessibleName('AI provider setup instructions')
@@ -377,6 +394,14 @@ class MonitorWindow(QMainWindow):
         form.addWidget(self.provider_guide)
         form.addWidget(self.provider_instructions)
         form.addWidget(self.provider_link)
+        self.codex_setup_button = self._button('Install / sign in Codex…', self._codex_setup)
+        self.codex_setup_button.hide(); form.addWidget(self.codex_setup_button)
+        self.claude_link_button = self._button('Link Claude quota…', lambda: self.claude_quota(False))
+        self.claude_unlink_button = self._button('Remove Claude quota link…', lambda: self.claude_quota(True))
+        self.claude_link_button.hide(); self.claude_unlink_button.hide()
+        bridge_row = QHBoxLayout()
+        bridge_row.addWidget(self.claude_link_button); bridge_row.addWidget(self.claude_unlink_button)
+        form.addLayout(bridge_row)
         self.key_row = QWidget()
         key_layout = QHBoxLayout(self.key_row)
         key_layout.setContentsMargins(0, 0, 0, 0)
@@ -388,8 +413,8 @@ class MonitorWindow(QMainWindow):
         key_layout.addWidget(self.key, 1)
         key_layout.addWidget(self.clear_key)
         form.addWidget(self.key_row)
-        form.addWidget(label('After Start host succeeds, you can close this app. The host keeps running invisibly '
-                             'until you click Stop host, sign out or shut down the PC.', 'muted', True))
+        form.addWidget(label('By default you can close this app after starting the host; it keeps running invisibly. '
+                             'Change this in Host settings, or use Stop host.', 'muted', True))
         bottom = QHBoxLayout()
         bottom.addWidget(label('Quota refresh'))
         self.interval = QSpinBox()
@@ -401,8 +426,6 @@ class MonitorWindow(QMainWindow):
         bottom.addWidget(label('Status reads only — no model requests', 'muted'))
         form.addLayout(bottom)
         form.addStretch()
-        self.board.currentIndexChanged.connect(self._changed)
-        self.port.currentTextChanged.connect(self._changed)
         self.key.textChanged.connect(self._changed)
         self.clear_key.toggled.connect(self._changed)
         self.interval.valueChanged.connect(self._changed)
@@ -526,6 +549,9 @@ class MonitorWindow(QMainWindow):
 
     def _show_provider_guide(self):
         key = self.provider_guide.currentData()
+        self.codex_setup_button.setVisible(key == 'codex')
+        self.claude_link_button.setVisible(key == 'claude')
+        self.claude_unlink_button.setVisible(key == 'claude')
         if key in PROVIDER_SETUP:
             self.provider_instructions.setText(PROVIDER_SETUP[key][0])
             self.provider_link.setEnabled(True)
@@ -534,6 +560,25 @@ class MonitorWindow(QMainWindow):
         key = self.provider_guide.currentData()
         if key in PROVIDER_SETUP:
             QDesktopServices.openUrl(QUrl(PROVIDER_SETUP[key][1]))
+
+    def check_ai_setup(self):
+        if self._ready():
+            from provider_setup import readiness
+            self._run('Checking AI setup', lambda emit: readiness(self.root, emit))
+
+    def claude_quota(self, remove):
+        if not self._ready() or 'claude' not in self.config['providers']: return
+        text = ('Remove only this installation\'s Claude statusline link? Other Claude settings and local token activity are preserved.' if remove else
+                'Link Claude subscription quota using its official statusline? A private backup is kept. Existing custom statuslines are preserved. '
+                'The link reads numeric quota fields; it does not make model requests.')
+        answer = QMessageBox.question(self, 'Claude quota link', text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes: return
+        from provider_setup import claude_bridge
+        def action(emit):
+            try: emit(claude_bridge(self.root, remove=remove))
+            except ValueError as error: raise control.SetupError(str(error)) from None
+        self._run('Updating Claude quota link', action)
 
     def rescan(self):
         current = self.port.currentText() or self.config['port']
@@ -593,7 +638,7 @@ class MonitorWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes)
             if answer == QMessageBox.StandardButton.Yes:
-                self.integrations()
+                self._codex_setup()
 
     def _ready(self):
         if self.config_error or self.unsaved or not self.config.get('board') or not self.config['providers']:
@@ -666,16 +711,25 @@ class MonitorWindow(QMainWindow):
         self._run('Recovering local settings', lambda emit: desktop.reset_invalid_settings(self.root))
 
     def _apply_preferences(self):
+        self.close_hint.setText('LOCAL RECORDS + USB\n' + ('Close this window and your\nhost keeps running.' if self.config['keep_host_on_close'] else
+                               'Closing this window stops\nthis installation\'s host.'))
         for box in (self.activity, self.host_log):
             box.setStyleSheet('QPlainTextEdit { font-family: "Consolas"; font-size: ' +
                               str(self.config['log_font_size']) + 'pt; }')
 
     def integrations(self):
+        self.tabs.setCurrentIndex(1)
+        choices = [key for key, field in self.providers.items() if field.isChecked()]
+        if choices: self.provider_guide.setCurrentIndex(self.provider_guide.findData(choices[0]))
+
+    def _codex_setup(self):
         if not self._ready():
             return
+        if 'codex' not in self.config['providers']:
+            self._error('Select Codex and save settings first.'); return
         try:
-            desktop.open_integrations(self.root)
-            self.append_output('Provider setup opened in its own console. Follow the official sign-in prompts there.')
+            desktop.open_integrations(self.root, codex_only=True)
+            self.append_output('Official Codex setup opened in its own console. Follow its installation/sign-in prompts there.')
         except (control.SetupError, OSError):
             self._error('Provider setup could not open. Check that the complete package is extracted.')
 
@@ -785,6 +839,6 @@ def run_desktop(firmware: bool = False) -> int:
             'Repair the local tools/aim_host.json file or extract a fresh package. Your file was not changed.')
         return 1
     if firmware:
-        window.tabs.setCurrentIndex(2)
+        window.tabs.setCurrentIndex(3)
     window.show()
     return application.exec()

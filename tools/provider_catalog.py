@@ -7,12 +7,12 @@ PROVIDERS = {
     'copilot': ('GitHub Copilot', 16, 'External numeric bridge required; SDK usage events are supported'),
     'cursor': ('Cursor', 32, 'External numeric bridge required; no automatic personal-quota adapter'),
     'antigravity': ('Antigravity', 64, 'External numeric bridge required; no automatic quota adapter'),
-    'opencode': ('OpenCode', 128, 'External numeric bridge required; SDK usage export can be supplied'),
+    'opencode': ('OpenCode', 128, 'Automatic local SQLite token usage; no remaining account quota'),
 }
 
 # Instructions are bundled and visible without a browser or a cloud request.
 PROVIDER_SETUP = {
-    'codex': ('1. Select Codex and save settings.\n2. Click Provider setup for the official CLI installer/sign-in. '
+    'codex': ('1. Select Codex and save settings.\n2. Click Install / sign in Codex in AI setup for the official CLI installer/sign-in. '
               'Use your own account; no API key is required here.\n3. Use Codex normally. Local tokens animate the robot; '
               'the CLI supplies available 5-hour and 7-day quotas.',
               'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/CODEX_SETUP.md'),
@@ -22,21 +22,26 @@ PROVIDER_SETUP = {
               'is unavailable. The display lists only the windows your plan reports.',
               'https://docs.z.ai/devpack/quick-start'),
     'claude': ('1. Install Claude Code, sign in and use the CLI on this PC. Local token records are read automatically.\n'
-               '2. For available subscription quotas, click Provider setup and explicitly install the optional '
-               'statusline bridge. Existing custom statuslines are preserved.\n3. Restart Claude Code. '
+               '2. For available subscription quotas, click Link Claude quota below. Existing custom '
+               'statuslines are preserved.\n3. Restart Claude Code. '
                'A Claude API key alone does not supply subscription quotas.',
                'https://code.claude.com/docs/en/statusline'),
     'gemini': ('1. Install Gemini CLI and sign in with your own account.\n2. Use recorded CLI sessions on this PC; '
                'the monitor reads their numeric token totals.\n3. This integration displays LOCAL activity. '
                'Automatic remaining account quota is unavailable; no key is entered in this app.',
                'https://geminicli.com/docs/cli/session-management/'),
+    'opencode': ('1. Install OpenCode and connect your own provider in its official client.\n'
+                 '2. Select OpenCode and save settings. The monitor reads numeric tokens from its local SQLite database automatically.\n'
+                 '3. Use OpenCode normally, then click Check AI setup. This integration shows LOCAL activity; '
+                 'remaining account quota is unavailable. No scripts or monitor API key are needed.',
+                 'https://docs.opencode.ai/docs/'),
     **{key: (f'1. Select {name} and save settings.\n2. Connect your own integration to '
               f'AI-Monitor-Console.exe --ingest {key}, sending cumulative numeric token counters. '
               'See the bundled provider guide for the JSON format.\n3. This bridge shows LOCAL activity. '
               'Selecting the provider alone does not import editor activity or account quota.',
               'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md#external-numeric-bridge')
        for key, name in [('copilot', 'GitHub Copilot'), ('cursor', 'Cursor'),
-                         ('antigravity', 'Antigravity'), ('opencode', 'OpenCode')]},
+                         ('antigravity', 'Antigravity')]},
 }
 
 

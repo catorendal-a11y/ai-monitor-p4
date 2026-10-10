@@ -879,9 +879,9 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
             rows = [dict(title=row['title'], usedPercent=percent_value(row['usedPercent']),
                          resetsAt=now_iso_epoch(row['reset_epoch']), windowMinutes=row['windowMinutes']) for row in reported] if reported else None
             notice = None if rows else ('Local token activity; quota bridge optional' if provider == 'claude' else
-                                       'Local token activity; quota unavailable' if provider == 'gemini' else
+                                       'Local token activity; quota unavailable' if provider in ('gemini', 'opencode') else
                                        'Numeric telemetry bridge required; see provider guide')
-            if not rows and provider not in ('claude', 'gemini') and read_counters(HERE / 'activity', provider) is not None:
+            if not rows and provider not in ('claude', 'gemini', 'opencode') and read_counters(HERE / 'activity', provider) is not None:
                 notice = 'External token activity; quota unavailable'
             informational = not rows
         else:

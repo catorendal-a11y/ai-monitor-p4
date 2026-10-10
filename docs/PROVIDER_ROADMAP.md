@@ -65,9 +65,9 @@ Exit: SDK users can install/configure the bridge through a documented flow; pers
 
 Dependency: Step 2.
 
-## Step 5 - OpenCode bridge
+## Step 5 - OpenCode local adapter (implemented in v1.17.0)
 
-Context: OpenCode is selectable but has no automatic local adapter. Its documented SDK supplies a source to evaluate. Token fields and cache semantics must be verified for the supported version.
+Scope update, 2026-10-10: the user requested setup from the app. Official OpenCode V1/V2 SQLite projections and normalized cache/reasoning semantics were verified. A bounded read-only numeric adapter now covers those schemas, with hashed IDs, imported-session baselines and synthetic tests. Unsupported schemas stay unavailable; remaining account quota is not supported. The SDK bridge remains a possible extension. See PROVIDERS.md for primary references.
 
 Files: `integrations/opencode/`, existing bridge/capability modules, fixtures and provider documentation.
 

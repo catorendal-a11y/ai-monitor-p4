@@ -16,7 +16,6 @@ import psutil
 from serial.tools import list_ports
 import aim_host as host
 from provider_catalog import PROVIDERS, selected_providers
-import base64
 from codex_support import setup_codex, codex_command
 from host_security import read_local_json, safe_text, serial_port, powershell_executable
 from board_profiles import BOARDS, get_board, configured_board
@@ -361,33 +360,11 @@ def integration_help(root=ROOT, ask=input, home=None):
         try: setup_codex(ask)
         except RuntimeError as error: raise SetupError(str(error)) from None
     if 'claude' not in config['providers']: return
-    settings = (Path.home() if home is None else Path(home)) / '.claude/settings.json'
     print('Optional Claude quota bridge uses the documented statusline fields.')
     if ask('Install the Claude quota bridge? Type INSTALL, or Enter to skip: ').strip() != 'INSTALL': return
-    document = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
-    if not isinstance(document, dict): raise SetupError('Claude settings are invalid; nothing changed.')
-    if document.get('statusLine'):
-        raise SetupError('Existing Claude statusline preserved. See docs/PROVIDERS.md to integrate manually.')
-    if getattr(sys, 'frozen', False):
-        command = [sys.executable, '--claude-statusline']
-    else:
-        command = [sys.executable, str(root / 'tools/aim_control.py'), '--claude-statusline']
-    if os.name == 'nt':
-        expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + argument.replace("'", "''") + "'" for argument in command)
-        encoded = base64.b64encode(expression.encode('utf-16le')).decode('ascii')
-        shell_command = '"' + powershell_executable() + '" -NoProfile -EncodedCommand ' + encoded
-    else:
-        import shlex
-        shell_command = shlex.join(command)
-    document['statusLine'] = {'type': 'command', 'command': shell_command}
-    settings.parent.mkdir(parents=True, exist_ok=True)
-    if settings.exists():
-        import shutil
-        backup = settings.with_name('settings.ai-monitor-backup-' + str(time.time_ns()) + '.json')
-        shutil.copy2(settings, backup)
-    from telemetry_bridge import write_record
-    write_record(settings, document)
-    print('Claude quota bridge installed. Restart Claude Code. Existing statuslines are never replaced.')
+    from provider_setup import claude_bridge
+    try: print(claude_bridge(root, home=home))
+    except ValueError as error: raise SetupError(str(error)) from None
 
 
 def main(argv=None):
@@ -395,6 +372,7 @@ def main(argv=None):
     parser.add_argument("--host", action="store_true", help="Run the background companion")
     parser.add_argument("--check", action="store_true", help="Show local diagnostics without connecting to the panel or API")
     parser.add_argument('--integrations', action='store_true', help='Open selected provider integrations interactively')
+    parser.add_argument('--setup-codex', action='store_true', help='Install/sign in the explicitly selected official Codex CLI')
     parser.add_argument('--ingest', choices=list(PROVIDERS), help='Read a cumulative numeric telemetry record from stdin')
     parser.add_argument('--claude-statusline', action='store_true', help='Receive documented Claude statusline quota fields')
     args = parser.parse_args(argv)
@@ -414,9 +392,13 @@ def main(argv=None):
     if args.check:
         status()
         return 0
-    if args.integrations:
+    if args.integrations or args.setup_codex:
         try:
-            integration_help()
+            if args.setup_codex:
+                if 'codex' not in local_config()['providers']: raise SetupError('Select Codex and save settings first.')
+                setup_codex()
+            else:
+                integration_help()
         except (ValueError, RuntimeError, OSError):
             print('Provider setup could not finish. Check your selected providers and official CLI installation.')
         try:
